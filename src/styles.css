@@ -372,3 +372,21 @@ textarea.input { min-height: 88px; resize: vertical; }
 .sens-opt.pain.on i { background: var(--pain); }
 .sens-opt.tingling.on i { background: var(--tingling) radial-gradient(circle, rgba(255,255,255,.8) 1px, transparent 1.4px) 0 0 / 4px 4px; }
 .sens-opt.numb.on i { background: var(--numb) repeating-linear-gradient(45deg, rgba(255,255,255,.5) 0 1.5px, transparent 1.5px 4px); }
+.bodymap-panels { position: relative; display: grid; grid-template-columns: 200fr 120fr; gap: 6px; }
+.bodymap-panels figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.bodymap-panels figcaption { font-size: 12px; color: var(--muted); }
+.bodymap-svg .deco.torso { fill: var(--body-fill); opacity: 0.45; }
+.bodymap-svg .vert { fill: color-mix(in srgb, var(--body-fill) 72%, var(--ink)); transition: fill 0.15s; pointer-events: none; }
+.bodymap-svg .vert.pain { fill: var(--pain); }
+.bodymap-svg .vert.tingling { fill: url(#pat-tingling); }
+.bodymap-svg .vert.numb { fill: url(#pat-numb); }
+.bodymap-svg g[role='button'] { cursor: pointer; }
+.small-chips { justify-content: center; }
+.small-chips .chip { min-height: 32px; padding: 5px 12px; font-size: 14px; }
+.quick-add { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.quick-add button { border: 0; background: var(--surface); border-radius: var(--r); padding: 12px 6px 10px; display: flex; flex-direction: column; align-items: center; gap: 7px; font-size: 14px; font-weight: 500; color: var(--ink); }
+.quick-add button:active { background: var(--fill); }
+.quick-add span { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; color: #fff; }
+.quick-add svg { width: 20px; height: 20px; }
+.row-sub { display: block; font-size: 14px; color: var(--ink-2); }
+.srow-top .x-btn svg { width: 14px; height: 14px; }

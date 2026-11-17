@@ -6,10 +6,10 @@ import {
   VERDICT_LABEL, type WindowId,
 } from '../lib/analysis';
 import { DURATIONS, HELPED_LABELS, IMPACTS } from '../lib/catalog';
-import { regionLabel, SENSATION_LABEL } from '../components/BodyMap';
+import { diagramSvg, regionLabel, SENSATION_LABEL } from '../components/BodyMap';
 import { entrySummary } from '../components/EntryRow';
 import { DAY, fmtDay, fmtTime, fromDayKey } from '../lib/time';
-import { bodyMapSvg, stamp, svgToPng } from './files';
+import { stamp, svgToPng } from './files';
 
 export interface ReportOptions {
   from: number;
@@ -144,12 +144,12 @@ export async function buildReport(all: Entry[], s: Settings, o: ReportOptions): 
     h2('Where symptoms were felt', `${regions.total} entries with a body map`);
     ensure(70);
     const heat = Object.fromEntries(regions.counts.map(([r, n]) => [r, n / regions.total]));
-    const png = await svgToPng(bodyMapSvg(heat, s.incision));
+    const png = await svgToPng(diagramSvg(heat));
     const top = y;
-    if (png) doc.addImage(png, 'PNG', M, y, 84, 59.6);
+    if (png) doc.addImage(png, 'PNG', M, y, 74, 65.3);
     y = top;
     autoTable(doc, {
-      startY: top, margin: { left: M + 90, right: M },
+      startY: top, margin: { left: M + 80, right: M },
       head: [['Area', 'How often', 'Described as']],
       body: regions.counts.slice(0, 12).map(([r, n]) => [
         regionLabel(r), `${Math.round((n / regions.total) * 100)}%`,
@@ -158,7 +158,7 @@ export async function buildReport(all: Entry[], s: Settings, o: ReportOptions): 
       styles: { font: 'helvetica', fontSize: 8, cellPadding: 1.5, textColor: INK, lineColor: LINE, lineWidth: 0.2 },
       headStyles: { fillColor: [244, 241, 236], textColor: INK2 }, theme: 'grid',
     });
-    y = Math.max(top + 62, ((doc as any).lastAutoTable?.finalY ?? top) + 6);
+    y = Math.max(top + 68, ((doc as any).lastAutoTable?.finalY ?? top) + 6);
   }
 
   /* ---------- character ---------- */

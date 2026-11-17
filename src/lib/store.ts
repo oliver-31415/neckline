@@ -62,7 +62,7 @@ export async function rememberTreatment(name: string, kind: string, dose?: strin
 }
 
 /** Add a custom chip value to a settings list if it's new. */
-export async function rememberChip(key: 'qualities' | 'symptoms' | 'activities' | 'mealTags' | 'sideEffects', value: string) {
+export async function rememberChip(key: 'qualities' | 'symptoms' | 'activities' | 'exercises' | 'mealTags' | 'sideEffects', value: string) {
   const list = settings.value[key];
   if (!list.some((v) => v.toLowerCase() === value.toLowerCase())) await updateSettings({ [key]: [...list, value] });
 }

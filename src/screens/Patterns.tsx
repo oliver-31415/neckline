@@ -11,7 +11,6 @@ import { PainTrend, TrendLegend } from '../components/Charts';
 import { BodyMap, regionLabel } from '../components/BodyMap';
 import { Nav, Seg } from '../components/ui';
 import { IconInfo, IconPatterns, IconSpark } from '../components/Icons';
-import { settings } from '../lib/store';
 
 export const RANGES = [
   { v: 7, label: '7 days' }, { v: 14, label: '14 days' }, { v: 30, label: '30 days' }, { v: 90, label: '90 days' },
@@ -102,7 +101,7 @@ export function Patterns() {
         <div class="card-head"><h2>Where it shows up</h2><span class="small muted">{regions.total} mapped entries</span></div>
         {regions.total ? (
           <>
-            <BodyMap heat={heat} incision={settings.value.incision} maxWidth={220} />
+            <BodyMap heat={heat} />
             <HBars max={100} color="var(--pain)" rows={regions.counts.slice(0, 6).map(([r, n]) => ({ label: regionLabel(r), value: (n / regions.total) * 100, text: `${Math.round((n / regions.total) * 100)}%` }))} />
           </>
         ) : <p class="small muted">Mark areas on the body map during check-ins to see this.</p>}

@@ -55,6 +55,8 @@ export interface TreatmentEntry extends Base {
   dose?: string;
   helped: Helped | null;
   sideEffects: string[];
+  minutes?: number | null; // exercises: how long
+  holdSeconds?: number | null; // exercises: how long each hold/stretch
 }
 
 export interface DayEntry extends Base {
@@ -97,6 +99,7 @@ export interface Settings {
   qualities: string[];
   symptoms: string[];
   activities: string[];
+  exercises: string[];
   postures: string[];
   mealTags: string[];
   sideEffects: string[];

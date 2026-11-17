@@ -98,14 +98,35 @@ const mapTap = async (vx, vy) => {
   await page.mouse.click(b.x + (vx - 10) * k, b.y + (vy - 4) * k);
   await page.waitForTimeout(120);
 };
-await mapTap(149, 132); // right front of neck (below the incision marker)
-await mapTap(115, 148); // right top of shoulder
-await mapTap(57, 398);  // right hand, thumb side
+// Back panel (viewBox 0 4 200 280) and arm panel (0 4 120 280).
+const panelTap = async (n, vx, vy, vw) => {
+  const svg = page.locator('.bodymap-svg').nth(n);
+  await svg.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  const b = await svg.boundingBox();
+  const k = b.width / vw;
+  await page.mouse.click(b.x + vx * k, b.y + (vy - 4) * k);
+  await page.waitForTimeout(120);
+};
+await panelTap(0, 115, 85, 200); // right upper neck
+await panelTap(0, 100, 115, 200); // spine C5
+await panelTap(0, 168, 200, 200); // right shoulder blade
+await panelTap(1, 60, 100, 120);  // right upper arm
+await panelTap(1, 70, 250, 120);  // right hand, thumb side
 await page.locator('.srow').last().locator('.sens-opt:has-text("Tingling")').click();
 await page.waitForTimeout(2000);
 await shot('06-checkin-filled', false);
 await page.evaluate(() => window.scrollTo(0, 700));
 await shot('07-checkin-regions', false);
+await page.click('.quick-add button:has-text("Posture")');
+await page.click('.sheet .tile:has-text("Looking down")');
+await page.click('.sheet .chip:has-text("1 h")');
+await page.click('.sheet-head .bar-btn.strong');
+await page.click('.quick-add button:has-text("Exercise")');
+await page.click('.sheet .chip:has-text("Chin tucks")');
+await page.click('.sheet .chip:has-text("10 min")');
+await shot('07b-exercise', false);
+await page.click('.sheet .chip:has-text("10 s")');
+await page.click('.sheet-head .bar-btn.strong');
 await page.click('.row-item:has-text("Feels like")');
 await page.click('.chip:has-text("Burning")');
 await page.evaluate(() => window.scrollTo(0, 99999));

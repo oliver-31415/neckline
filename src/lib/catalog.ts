@@ -23,6 +23,11 @@ export const DEFAULT_ACTIVITIES = [
   'Computer', 'Phone', 'Driving', 'Lifting', 'Exercise', 'Walking', 'Housework', 'Reading', 'Rest',
 ];
 
+export const DEFAULT_EXERCISES = [
+  'Chin tucks', 'Neck rotations', 'Shoulder rolls', 'Shoulder blade squeezes', 'Upper trap stretch',
+  'Levator stretch', 'Nerve glides', 'Walking', 'Physio programme',
+];
+
 export const DEFAULT_QUALITIES = [
   'Aching', 'Burning', 'Sharp', 'Stabbing', 'Throbbing', 'Tingling', 'Numb', 'Stiff', 'Shooting', 'Pressure',
 ];
@@ -67,7 +72,7 @@ export const STEPS: { id: StepId; label: string; hint: string }[] = [
   { id: 'duration', label: 'How long it lasts', hint: '' },
   { id: 'impact', label: 'What it’s affecting', hint: 'Sleep, work…' },
   { id: 'symptoms', label: 'Other symptoms', hint: '' },
-  { id: 'context', label: 'What you were doing', hint: 'Posture & activity' },
+  { id: 'context', label: 'Activities', hint: 'Computer, driving…' },
   { id: 'note', label: 'Note', hint: '' },
 ];
 
@@ -78,6 +83,7 @@ export const DEFAULT_SETTINGS: Settings = {
   qualities: DEFAULT_QUALITIES,
   symptoms: DEFAULT_SYMPTOMS,
   activities: DEFAULT_ACTIVITIES,
+  exercises: DEFAULT_EXERCISES,
   postures: Object.keys(POSTURES),
   mealTags: DEFAULT_MEAL_TAGS,
   sideEffects: DEFAULT_SIDE_EFFECTS,

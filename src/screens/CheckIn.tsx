@@ -2,14 +2,15 @@ import { useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { entries, rememberChip, removeEntry, saveEntry, settings, uid } from '../lib/store';
 import { closeSheet, go, openSheet, pendingSlot } from '../lib/nav';
-import { DURATIONS, IMPACTS, POSTURES } from '../lib/catalog';
+import { DURATIONS, IMPACTS } from '../lib/catalog';
 import { ago, fmtSlot, fmtTime } from '../lib/time';
 import { isIOS, isStandalone, slotStatus } from '../lib/env';
 import type { Level, PainEntry, Sensation } from '../lib/types';
-import { BodyMap, regionLabel } from '../components/BodyMap';
+import { BodyMap, SPINE, regionLabel } from '../components/BodyMap';
 import { Chips, Nav, PainPill, Seg, Sheet, SliderRow, WhenPicker, showToast } from '../components/ui';
-import { IconChevron, IconClose, IconGear, IconPlus, IconShare } from '../components/Icons';
-import { ActivityTiles, PostureTiles } from '../forms/common';
+import { IconChevron, IconClose, IconDownChev, IconExercise, IconGear, IconPill, IconPlus, IconPosture, IconShare, IconUpChev } from '../components/Icons';
+import { ActivityTiles } from '../forms/common';
+import { QuickExercise, QuickMed, QuickPosture, extraSummary, type Extra } from '../forms/QuickAdd';
 
 type Draft = Omit<PainEntry, 'intensity'> & { intensity: number | null | undefined; levels: Record<string, number> };
 type Detail = 'time' | 'quality' | 'duration' | 'impact' | 'symptoms' | 'context' | 'note';
@@ -43,10 +44,28 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
   const [d, setD] = useState<Draft>(() => (entry ? { ...entry, levels: entry.levels ?? {} } : blank()));
   const [timeSet, setTimeSet] = useState(editing);
   const [open, setOpen] = useState<Detail | null>(null);
+  const [extras, setExtras] = useState<Extra[]>([]);
+  const [adding, setAdding] = useState<'posture' | 'med' | 'exercise' | null>(null);
   const set = (p: Partial<Draft>) => setD({ ...d, ...p });
 
   const regionIds = Object.keys(d.regions);
-  const touched = d.intensity !== undefined || regionIds.length > 0 || d.qualities.length + d.symptoms.length + d.postures.length + d.activities.length > 0 || !!d.note || !!d.duration || Object.values(d.impacts).some((v) => v != null);
+  const painTouched = d.intensity !== undefined || regionIds.length > 0 || d.qualities.length + d.symptoms.length + d.postures.length + d.activities.length > 0 || !!d.note || !!d.duration || Object.values(d.impacts).some((v) => v != null);
+  const touched = painTouched || extras.length > 0;
+
+  /** Move a marked vertebra up (-1) or down (+1) the spine, keeping its level and sensation. */
+  function moveSpine(id: string, dir: -1 | 1) {
+    const i = SPINE.indexOf(id.slice(6)) + dir;
+    const to = `spine-${SPINE[i]}`;
+    if (i < 0 || i >= SPINE.length || d.regions[to]) return;
+    const regions: Draft['regions'] = {};
+    const levels: Draft['levels'] = {};
+    for (const k of Object.keys(d.regions)) {
+      const nk = k === id ? to : k;
+      regions[nk] = d.regions[k];
+      if (d.levels[k] != null) levels[nk] = d.levels[k];
+    }
+    set({ regions, levels });
+  }
 
   function tapRegion(id: string) {
     const regions = { ...d.regions };
@@ -66,15 +85,19 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
       time: timeSet ? d.time : Date.now(),
       slot: d.mode === 'checkin' ? slot : null,
     };
-    const saved = await saveEntry(out);
+    if (editing) { await saveEntry(out); closeSheet(); showToast('Saved'); return; }
+    const ids: string[] = [];
+    for (const x of extras) ids.push((await saveEntry(x)).id);
+    if (painTouched) ids.push((await saveEntry(out)).id);
     navigator.vibrate?.(12);
-    if (editing) { closeSheet(); showToast('Saved'); return; }
     pendingSlot.value = null;
     setD(blank());
+    setExtras([]);
     setTimeSet(false);
     setOpen(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    showToast(d.mode === 'change' ? 'Pain change saved' : 'Check-in saved', { label: 'Undo', run: () => removeEntry(saved.id) });
+    const msg = !painTouched ? 'Saved' : d.mode === 'change' ? 'Pain change saved' : 'Check-in saved';
+    showToast(msg, { label: 'Undo', run: () => ids.forEach((id) => removeEntry(id)) });
   }
 
   const body = (
@@ -116,7 +139,15 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
                   label={regionLabel(id)}
                   value={d.levels[id]}
                   onChange={(v) => set({ levels: { ...d.levels, [id]: v } })}
-                  accessory={<button class="x-btn" aria-label={`Remove ${regionLabel(id)}`} onClick={() => tapRegion(id)}><IconClose /></button>}
+                  accessory={<>
+                    {id.startsWith('spine-') && (
+                      <>
+                        <button class="x-btn" aria-label="One vertebra higher" onClick={() => moveSpine(id, -1)}><IconUpChev /></button>
+                        <button class="x-btn" aria-label="One vertebra lower" onClick={() => moveSpine(id, 1)}><IconDownChev /></button>
+                      </>
+                    )}
+                    <button class="x-btn" aria-label={`Remove ${regionLabel(id)}`} onClick={() => tapRegion(id)}><IconClose /></button>
+                  </>}
                 >
                   <SensationPill value={d.regions[id]} onChange={(v) => set({ regions: { ...d.regions, [id]: v } })} />
                 </SliderRow>
@@ -125,6 +156,36 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
           )}
         </section>
       )}
+
+      {!editing && (
+        <section class="section">
+          <div class="sec-head"><span>Since your last check-in</span><span class="sec-aside">optional</span></div>
+          <div class="quick-add">
+            <button onClick={() => setAdding('posture')}><span style={{ background: 'var(--posture)' }}><IconPosture /></span>Posture</button>
+            <button onClick={() => setAdding('med')}><span style={{ background: 'var(--treatment)' }}><IconPill /></span>Medication</button>
+            <button onClick={() => setAdding('exercise')}><span style={{ background: 'var(--activity)' }}><IconExercise /></span>Exercise</button>
+          </div>
+          {extras.length > 0 && (
+            <div class="group" style={{ marginTop: 10 }}>
+              {extras.map((x) => {
+                const sm = extraSummary(x);
+                const color = x.type === 'posture' ? 'var(--posture)' : x.kind === 'exercises' ? 'var(--activity)' : 'var(--treatment)';
+                const Icon = x.type === 'posture' ? IconPosture : x.kind === 'exercises' ? IconExercise : IconPill;
+                return (
+                  <div class="row-item" key={x.id}>
+                    <span class="row-icon" style={{ background: color }}><Icon /></span>
+                    <span class="row-label">{sm.title}{sm.detail && <span class="row-sub">{sm.detail}</span>}</span>
+                    <button class="x-btn" aria-label={`Remove ${sm.title}`} onClick={() => setExtras(extras.filter((e) => e !== x))}><IconClose /></button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
+      {adding === 'posture' && <QuickPosture onClose={() => setAdding(null)} onAdd={(x) => { setExtras([...extras, x]); setAdding(null); }} />}
+      {adding === 'med' && <QuickMed onClose={() => setAdding(null)} onAdd={(x) => { setExtras([...extras, x]); setAdding(null); }} />}
+      {adding === 'exercise' && <QuickExercise onClose={() => setAdding(null)} onAdd={(x) => { setExtras([...extras, x]); setAdding(null); }} />}
 
       <section class="section">
         <div class="sec-head"><span>Details</span><span class="sec-aside">optional</span></div>
@@ -160,11 +221,8 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
             </Expand>
           )}
           {s.steps.context && (
-            <Expand id="context" open={open} setOpen={setOpen} label="What you were doing" value={[...d.postures.map((p) => POSTURES[p]?.label ?? p), ...d.activities].join(', ')}>
-              <div class="stack" style={{ gap: 14 }}>
-                <PostureTiles options={s.postures} value={d.postures} onChange={(postures) => set({ postures })} />
-                <ActivityTiles options={s.activities} value={d.activities} onChange={(activities) => set({ activities })} onAdd={(v) => rememberChip('activities', v)} />
-              </div>
+            <Expand id="context" open={open} setOpen={setOpen} label="Activities" value={d.activities.join(', ')}>
+              <ActivityTiles options={s.activities} value={d.activities} onChange={(activities) => set({ activities })} onAdd={(v) => rememberChip('activities', v)} />
             </Expand>
           )}
           {s.steps.note && (
@@ -204,7 +262,7 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
       {body}
       <div class="savebar">
         <button class="btn primary wide" disabled={!touched} onClick={save}>
-          {d.mode === 'change' ? 'Save Pain Change' : pendingSlot.value ? `Save ${fmtSlot(pendingSlot.value)} Check-In` : 'Save Check-In'}
+          {!painTouched && extras.length ? 'Save' : d.mode === 'change' ? 'Save Pain Change' : pendingSlot.value ? `Save ${fmtSlot(pendingSlot.value)} Check-In` : 'Save Check-In'}
         </button>
       </div>
     </div>

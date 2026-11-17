@@ -4,7 +4,6 @@ import { go } from '../lib/nav';
 import { POSTURES, STEPS } from '../lib/catalog';
 import { fmtSlot } from '../lib/time';
 import { Block, Chips, Nav, Seg, Toggle, showToast } from '../components/ui';
-import { BodyMap } from '../components/BodyMap';
 import { IconBack, IconBell, IconDownload, IconLock, IconTrash, IconUpload } from '../components/Icons';
 import { disablePush, enablePush, pushSupported, syncSchedule, testPush } from '../lib/push';
 import { makeBackup, restoreBackup } from '../export/backup';
@@ -12,7 +11,7 @@ import { shareOrDownload } from '../export/files';
 import { isStandalone } from '../lib/env';
 import type { Settings as S } from '../lib/types';
 
-type ListKey = 'qualities' | 'symptoms' | 'activities' | 'mealTags' | 'sideEffects';
+type ListKey = 'qualities' | 'symptoms' | 'activities' | 'exercises' | 'mealTags' | 'sideEffects';
 
 export function Settings() {
   const s = settings.value;
@@ -68,15 +67,12 @@ export function Settings() {
         <label class="field"><span>Surgery date (optional)</span><input type="date" class="input" value={s.surgeryDate} onChange={(e) => updateSettings({ surgeryDate: (e.target as HTMLInputElement).value })} /></label>
       </Block>
 
-      <Block title="Incision site" aside={s.incision ? 'tap to move' : 'tap the map to place'}>
-        <BodyMap incision={s.incision} onPlaceIncision={(p) => updateSettings({ incision: { ...p, orient: s.incision?.orient ?? (p.view === 'front' ? 'h' : 'v') } })} maxWidth={220} />
-        <div class="row">
-          <span class="grow small muted">Direction of the scar</span>
-          <div style={{ width: 200 }}>
-            <Seg options={[{ v: 'h', label: 'Across' }, { v: 'v', label: 'Up & down' }]} value={s.incision?.orient ?? null} onChange={(orient) => s.incision && orient && updateSettings({ incision: { ...s.incision, orient } })} />
-          </div>
-        </div>
-        {s.incision && <button class="link small" style={{ alignSelf: 'flex-start' }} onClick={() => updateSettings({ incision: null })}>Remove incision marker</button>}
+      <Block title="Incision" foot="Adds an “Incision” button under the body diagram.">
+        <Seg<string | null>
+          options={[{ v: 'front', label: 'Front of neck' }, { v: 'back', label: 'Back of neck' }]}
+          value={s.incision?.view ?? null}
+          onChange={(v) => updateSettings({ incision: v ? { view: v as 'front' | 'back', x: 0, y: 0, orient: v === 'front' ? 'h' : 'v' } : null })}
+        />
       </Block>
 
       <Block title="Check-in times">
@@ -129,6 +125,7 @@ export function Settings() {
         ['qualities', 'Pain descriptions'],
         ['symptoms', 'Other symptoms'],
         ['activities', 'Activities'],
+        ['exercises', 'Exercises'],
         ['mealTags', 'Food tags'],
         ['sideEffects', 'Side effects'],
       ] as [ListKey, string][]).map(([k, label]) => (

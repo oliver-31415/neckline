@@ -113,3 +113,6 @@ export const POSTURE_ART: Record<string, () => preact.JSX.Element> = {
   ),
 };
 export const IconPulse = () => <I><path d="M3 12h4l2.5-6 4 12 2.5-6H21" /></I>;
+export const IconExercise = () => <I><path d="M4 9v6M7 7v10M17 7v10M20 9v6M7 12h10" /></I>;
+export const IconUpChev = () => <I><path d="M6 15l6-6 6 6" /></I>;
+export const IconDownChev = () => <I><path d="M6 9l6 6 6-6" /></I>;
