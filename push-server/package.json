@@ -1,0 +1,9 @@
+{
+  "name": "neckline-push-server",
+  "private": true,
+  "type": "module",
+  "description": "Tiny reminder server for Neckline. Stores only push addresses + check-in times; never diary data.",
+  "scripts": { "start": "node server.mjs" },
+  "engines": { "node": ">=20" },
+  "dependencies": { "web-push": "^3.6.7" }
+}
