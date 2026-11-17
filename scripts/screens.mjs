@@ -118,11 +118,13 @@ await panelTap(0, 100, 115, 200); // spine C5
 await panelTap(0, 168, 200, 200); // right shoulder blade
 await panelTap(1, 60, 100, 120);  // right upper arm
 await panelTap(1, 75, 262, 120);  // right index finger
-await page.locator('.srow').last().locator('.kind:has-text("Tingling")').click();
-await page.locator('.srow').nth(1).locator('.kind:has-text("Ache")').click();
-await page.locator('.srow').nth(1).locator('.kind:has-text("Stiffness")').click();
+await page.locator('.arow').last().locator('.kind:has-text("Tingling")').click();
+await page.locator('.arow').nth(0).locator('.kind:has-text("Ache")').click();
+await page.locator('.arow').nth(0).locator('.kind:has-text("Stiff")').click();
+await page.locator('.seg button:has-text("Worse")').first().click();
 await page.click('.chip:has-text("Headache")');
 await page.waitForTimeout(2000);
+await page.evaluate(() => window.scrollTo(0, 0));
 await shot('06-checkin-filled', false);
 await page.evaluate(() => window.scrollTo(0, 700));
 await shot('07-checkin-regions', false);

@@ -2,12 +2,12 @@ import { useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { entries, rememberChip, removeEntry, saveEntry, settings, uid } from '../lib/store';
 import { closeSheet, go, openSheet, pendingSlot } from '../lib/nav';
-import { AREA_KINDS, DURATIONS, IMPACTS } from '../lib/catalog';
+import { AREA_KINDS, DURATIONS, IMPACTS, painWord } from '../lib/catalog';
 import { ago, fmtSlot, fmtTime } from '../lib/time';
 import { slotStatus } from '../lib/env';
 import type { Level, PainEntry, Sensation } from '../lib/types';
 import { BodyMap, SPINE, regionLabel } from '../components/BodyMap';
-import { Chips, Nav, PainPill, Seg, Sheet, SliderRow, WhenPicker, showToast } from '../components/ui';
+import { Chips, PainPill, PainSlider, Seg, Sheet, WhenPicker, showToast } from '../components/ui';
 import { IconChevron, IconClose, IconDownChev, IconExercise, IconGear, IconPill, IconPlus, IconPosture, IconUpChev } from '../components/Icons';
 import { ActivityTiles } from '../forms/common';
 import { QuickExercise, QuickMed, QuickPosture, extraSummary, type Extra } from '../forms/QuickAdd';
@@ -28,7 +28,7 @@ function KindChips({ value, onChange }: { value: Sensation[]; onChange: (v: Sens
       {AREA_KINDS.map((k) => {
         const on = value.includes(k.id);
         return (
-          <button key={k.id} class={'kind' + (on ? ' on' : '')} aria-pressed={on} onClick={() => onChange(on ? value.filter((x) => x !== k.id) : [...value, k.id])}>{k.label}</button>
+          <button key={k.id} class={'kind' + (on ? ' on' : '')} aria-pressed={on} aria-label={k.label} onClick={() => onChange(on ? value.filter((x) => x !== k.id) : [...value, k.id])}>{k.short}</button>
         );
       })}
     </div>
@@ -101,61 +101,57 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
     setTimeSet(false);
     setOpen(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    const msg = !painTouched ? 'Saved' : d.mode === 'change' ? 'Pain change saved' : 'Check-in saved';
+    const msg = 'Saved';
     showToast(msg, { label: 'Undo', run: () => ids.forEach((id) => removeEntry(id)) });
   }
 
   const body = (
     <>
-      {!editing && <ModeSwitch mode={d.mode} onChange={(mode) => set({ mode, trend: mode === 'checkin' ? null : d.trend })} />}
-
       <section class="section">
         <div class="group">
-          <SliderRow
-            label={d.mode === 'change' ? 'Pain now' : 'Overall pain'}
-            value={d.intensity}
-            onChange={(intensity) => set({ intensity })}
-            accessory={d.intensity === undefined && <button class="link small" onClick={() => set({ intensity: null })}>Not sure</button>}
-          />
-          {d.mode === 'change' && (
-            <div class="srow">
-              <Seg
-                options={[{ v: 'worse', label: 'Worse' }, { v: 'better', label: 'Better' }, { v: 'new', label: 'New spot' }]}
-                value={d.trend ?? null}
-                onChange={(trend) => set({ trend: trend as Draft['trend'] })}
-              />
+          <div class="srow">
+            <div class="srow-top">
+              <span class="srow-label">Pain</span>
+              <span class="srow-value">
+                {d.intensity === undefined
+                  ? <button class="link" onClick={() => set({ intensity: null })}>Not sure</button>
+                  : d.intensity === null ? <button class="link" onClick={() => set({ intensity: undefined })}>Not sure ✓</button>
+                  : <><span>{painWord(d.intensity)}</span><PainPill n={d.intensity} /></>}
+              </span>
             </div>
-          )}
+            <PainSlider value={d.intensity} onChange={(intensity) => set({ intensity })} label="Pain" />
+            <Seg
+              options={[{ v: 'better', label: 'Better' }, { v: 'same', label: 'Same' }, { v: 'worse', label: 'Worse' }]}
+              value={d.trend ?? null}
+              onChange={(trend) => set({ trend: trend as Draft['trend'], mode: trend === 'better' || trend === 'worse' ? 'change' : 'checkin' })}
+            />
+          </div>
         </div>
       </section>
 
       {s.steps.where && (
         <section class="section">
-          <div class="sec-head"><span>Where</span></div>
-          <div class="group pad">
+          <div class="group pad tight">
             <BodyMap value={d.regions} levels={d.levels} onTap={tapRegion} incision={s.incision} />
           </div>
           {regionIds.length > 0 && (
-            <div class="group" style={{ marginTop: 10 }}>
+            <div class="group" style={{ marginTop: 8 }}>
               {regionIds.map((id) => (
-                <SliderRow
-                  key={id}
-                  compact
-                  label={regionLabel(id)}
-                  value={d.levels[id]}
-                  onChange={(v) => set({ levels: { ...d.levels, [id]: v } })}
-                  accessory={<>
+                <div class="arow" key={id}>
+                  <div class="arow-line">
+                    <span class="arow-label">{regionLabel(id)}</span>
+                    <PainSlider value={d.levels[id]} onChange={(v) => set({ levels: { ...d.levels, [id]: v } })} label={regionLabel(id)} />
                     {id.startsWith('spine-') && (
-                      <>
+                      <span class="spine-step">
                         <button class="x-btn" aria-label="One vertebra higher" onClick={() => moveSpine(id, -1)}><IconUpChev /></button>
                         <button class="x-btn" aria-label="One vertebra lower" onClick={() => moveSpine(id, 1)}><IconDownChev /></button>
-                      </>
+                      </span>
                     )}
+                    <PainPill n={d.levels[id] ?? null} />
                     <button class="x-btn" aria-label={`Remove ${regionLabel(id)}`} onClick={() => tapRegion(id)}><IconClose /></button>
-                  </>}
-                >
+                  </div>
                   <KindChips value={d.kinds[id] ?? []} onChange={(ks) => set({ kinds: { ...d.kinds, [id]: ks }, regions: { ...d.regions, [id]: ks[0] ?? 'pain' } })} />
-                </SliderRow>
+                </div>
               ))}
             </div>
           )}
@@ -204,7 +200,7 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
       <section class="section">
         <div class="sec-head"><span>Details</span></div>
         <div class="group">
-          <Expand id="time" open={open} setOpen={setOpen} label="Time" value={timeSet ? fmtTime(d.time) : 'Now'}>
+          <Expand id="time" open={open} setOpen={setOpen} label="Time" value={timeSet ? fmtTime(d.time) : 'Now'} isSet={timeSet}>
             <WhenPicker value={d.time} onChange={(time) => { set({ time }); setTimeSet(true); }} />
           </Expand>
           {s.steps.duration && (
@@ -256,23 +252,20 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
 
   return (
     <div class="screen has-savebar">
-      <Nav title="Check In" sub={<LastReading />}>
+      <header class="bar">
+        <h1>Check In</h1>
+        <LastReading />
+        <span class="grow" />
         <button class="nav-btn" aria-label="Log something else" onClick={() => openSheet('add')}><IconPlus /></button>
         <button class="nav-btn" aria-label="Settings" onClick={() => go('settings')}><IconGear /></button>
-      </Nav>
+      </header>
       {body}
       <div class="savebar">
         <button class="btn primary wide" disabled={!touched} onClick={save}>
-          {!painTouched && extras.length ? 'Save' : d.mode === 'change' ? 'Save Pain Change' : pendingSlot.value ? `Save ${fmtSlot(pendingSlot.value)} Check-In` : 'Save Check-In'}
+          {pendingSlot.value ? `Save ${fmtSlot(pendingSlot.value)} Check-In` : 'Save'}
         </button>
       </div>
     </div>
-  );
-}
-
-function ModeSwitch({ mode, onChange }: { mode: PainEntry['mode']; onChange: (m: PainEntry['mode']) => void }) {
-  return (
-    <Seg required options={[{ v: 'checkin', label: 'Check-in' }, { v: 'change', label: 'Pain changed' }]} value={mode} onChange={(m) => onChange(m as PainEntry['mode'])} />
   );
 }
 
@@ -281,20 +274,20 @@ function LastReading() {
   if (!last) return null;
   return (
     <button class="last" onClick={() => go('history')}>
-      Last: <PainPill n={last.intensity} /> {ago(last.time)}
+      <PainPill n={last.intensity} /> {ago(last.time)}
     </button>
   );
 }
 
-function Expand({ id, open, setOpen, label, value, children }: {
-  id: Detail; open: Detail | null; setOpen: (d: Detail | null) => void; label: string; value?: string; children: ComponentChildren;
+function Expand({ id, open, setOpen, label, value, isSet = !!value, children }: {
+  id: Detail; open: Detail | null; setOpen: (d: Detail | null) => void; label: string; value?: string; isSet?: boolean; children: ComponentChildren;
 }) {
   const isOpen = open === id;
   return (
     <div class={'expand' + (isOpen ? ' open' : '')}>
       <button class="row-item" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : id)}>
         <span class="row-label">{label}</span>
-        <span class="row-value">{value}</span>
+        <span class={'row-value' + (isSet ? ' set' : '')}>{value}</span>
         <span class="row-chev"><IconChevron /></span>
       </button>
       {isOpen && <div class="expand-body">{children}</div>}

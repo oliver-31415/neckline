@@ -32,12 +32,12 @@ export const DEFAULT_QUALITIES = [
   'Aching', 'Burning', 'Sharp', 'Stabbing', 'Throbbing', 'Tingling', 'Numb', 'Stiff', 'Shooting', 'Pressure',
 ];
 
-export const AREA_KINDS: { id: Sensation; label: string }[] = [
-  { id: 'ache', label: 'Ache' },
-  { id: 'nerve', label: 'Sharp nerve pain' },
-  { id: 'tingling', label: 'Tingling' },
-  { id: 'cramp', label: 'Cramping' },
-  { id: 'stiff', label: 'Stiffness' },
+export const AREA_KINDS: { id: Sensation; label: string; short: string }[] = [
+  { id: 'ache', label: 'Ache', short: 'Ache' },
+  { id: 'nerve', label: 'Sharp nerve pain', short: 'Nerve pain' },
+  { id: 'tingling', label: 'Tingling', short: 'Tingling' },
+  { id: 'cramp', label: 'Cramping', short: 'Cramp' },
+  { id: 'stiff', label: 'Stiffness', short: 'Stiff' },
 ];
 
 export const DEFAULT_SYMPTOMS = [
