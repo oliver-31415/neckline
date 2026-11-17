@@ -8,9 +8,9 @@ import { slotStatus } from '../lib/env';
 import type { Level, PainEntry, Sensation } from '../lib/types';
 import { BodyMap, SPINE, regionLabel } from '../components/BodyMap';
 import { Chips, PainPill, PainSlider, Seg, Sheet, WhenPicker, showToast } from '../components/ui';
-import { IconChevron, IconClose, IconDownChev, IconExercise, IconGear, IconPill, IconPlus, IconPosture, IconUpChev } from '../components/Icons';
+import { IconChevron, IconClose, IconDownChev, IconGear, IconPlus, IconUpChev } from '../components/Icons';
 import { ActivityTiles } from '../forms/common';
-import { QuickExercise, QuickMed, QuickPosture, extraSummary, type Extra } from '../forms/QuickAdd';
+import { SinceLast, itemsToEntries, type Item } from '../forms/QuickAdd';
 
 type Draft = Omit<PainEntry, 'intensity'> & { intensity: number | null | undefined; levels: Record<string, number>; kinds: Record<string, Sensation[]> };
 type Detail = 'time' | 'duration' | 'impact' | 'context' | 'note';
@@ -46,8 +46,7 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
   } : blank()));
   const [timeSet, setTimeSet] = useState(editing);
   const [open, setOpen] = useState<Detail | null>(null);
-  const [extras, setExtras] = useState<Extra[]>([]);
-  const [adding, setAdding] = useState<'posture' | 'med' | 'exercise' | null>(null);
+  const [extras, setExtras] = useState<Item[]>([]);
   const set = (p: Partial<Draft>) => setD({ ...d, ...p });
 
   const regionIds = Object.keys(d.regions);
@@ -92,7 +91,7 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
     };
     if (editing) { await saveEntry(out); closeSheet(); showToast('Saved'); return; }
     const ids: string[] = [];
-    for (const x of extras) ids.push((await saveEntry(x)).id);
+    for (const x of itemsToEntries(extras)) ids.push((await saveEntry(x)).id);
     if (painTouched) ids.push((await saveEntry(out)).id);
     navigator.vibrate?.(12);
     pendingSlot.value = null;
@@ -167,35 +166,7 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
         </section>
       )}
 
-      {!editing && (
-        <section class="section">
-          <div class="sec-head"><span>Since your last check-in</span></div>
-          <div class="quick-add">
-            <button onClick={() => setAdding('posture')}><span style={{ background: 'var(--posture)' }}><IconPosture /></span>Posture</button>
-            <button onClick={() => setAdding('med')}><span style={{ background: 'var(--treatment)' }}><IconPill /></span>Medication</button>
-            <button onClick={() => setAdding('exercise')}><span style={{ background: 'var(--activity)' }}><IconExercise /></span>Exercise</button>
-          </div>
-          {extras.length > 0 && (
-            <div class="group" style={{ marginTop: 10 }}>
-              {extras.map((x) => {
-                const sm = extraSummary(x);
-                const color = x.type === 'posture' ? 'var(--posture)' : x.kind === 'exercises' ? 'var(--activity)' : 'var(--treatment)';
-                const Icon = x.type === 'posture' ? IconPosture : x.kind === 'exercises' ? IconExercise : IconPill;
-                return (
-                  <div class="row-item" key={x.id}>
-                    <span class="row-icon" style={{ background: color }}><Icon /></span>
-                    <span class="row-label">{sm.title}{sm.detail && <span class="row-sub">{sm.detail}</span>}</span>
-                    <button class="x-btn" aria-label={`Remove ${sm.title}`} onClick={() => setExtras(extras.filter((e) => e !== x))}><IconClose /></button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
-      )}
-      {adding === 'posture' && <QuickPosture onClose={() => setAdding(null)} onAdd={(x) => { setExtras([...extras, x]); setAdding(null); }} />}
-      {adding === 'med' && <QuickMed onClose={() => setAdding(null)} onAdd={(x) => { setExtras([...extras, x]); setAdding(null); }} />}
-      {adding === 'exercise' && <QuickExercise onClose={() => setAdding(null)} onAdd={(x) => { setExtras([...extras, x]); setAdding(null); }} />}
+      {!editing && <SinceLast items={extras} onChange={setExtras} />}
 
       <section class="section">
         <div class="sec-head"><span>Details</span></div>

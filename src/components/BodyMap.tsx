@@ -1,4 +1,6 @@
-import { useRef, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
+import type { ComponentChildren } from 'preact';
+import { IconZoomIn, IconZoomOut } from './Icons';
 import type { Incision, Sensation } from '../lib/types';
 import { painBg } from './ui';
 
@@ -181,11 +183,13 @@ export function BodyMap({ value = {}, levels = {}, onTap, heat, incision = null 
   );
 
   return (
-    <div class="bodymap">
-      <div class={'bodymap-panels' + (front ? ' front' : '')}>
-        {front ? <>{armPanel}{neckPanel}</> : <>{neckPanel}{armPanel}</>}
-        {flash && <div class="map-flash" aria-live="polite">{regionLabel(flash)}{heat ? ` · ${Math.round((heat[flash] ?? 0) * 100)}%` : ''}</div>}
-      </div>
+    <div class="bodymap" style={{ position: 'relative' }}>
+      <Zoomable key={view}>
+        <div class={'bodymap-panels' + (front ? ' front' : '')}>
+          {front ? <>{armPanel}{neckPanel}</> : <>{neckPanel}{armPanel}</>}
+        </div>
+      </Zoomable>
+      {flash && <div class="map-flash" aria-live="polite">{regionLabel(flash)}{heat ? ` · ${Math.round((heat[flash] ?? 0) * 100)}%` : ''}</div>}
       <div class="bodymap-foot">
         <div class="seg">
           <button class={!front ? 'on' : ''} onClick={() => setView('back')}>Back</button>
@@ -232,4 +236,95 @@ export function diagramSvg(heat: Record<string, number>) {
 <g>${back}</g><g transform="translate(212 0)">${arm}</g>${text(160, 298, 'Back')}
 <g transform="translate(345 0)"><g transform="${MA}">${arm}</g></g><g transform="translate(478 0)">${frontNeck}</g>${text(520, 298, 'Front')}
 </svg>`;
+}
+
+/*
+ * Pinch to zoom and drag to pan, for the diagram only (the rest of the app doesn't zoom).
+ * Taps still select areas while zoomed; a drag never does.
+ */
+interface Z { s: number; x: number; y: number }
+const MAX_ZOOM = 5;
+
+function Zoomable({ children }: { children: ComponentChildren }) {
+  const box = useRef<HTMLDivElement>(null);
+  const [z, setZ] = useState<Z>({ s: 1, x: 0, y: 0 });
+  const [animate, setAnimate] = useState(false);
+  const zr = useRef(z);
+  zr.current = z;
+
+  const clamp = (v: Z): Z => {
+    const el = box.current!;
+    const W = el.clientWidth, H = el.clientHeight;
+    const s = Math.min(MAX_ZOOM, Math.max(1, v.s));
+    return { s, x: Math.min(0, Math.max(W - W * s, v.x)), y: Math.min(0, Math.max(H - H * s, v.y)) };
+  };
+
+  useEffect(() => {
+    const el = box.current!;
+    let start: (Z & { mx: number; my: number; d: number; n: number; moved: boolean }) | null = null;
+    const at = (t: Touch) => { const r = el.getBoundingClientRect(); return { x: t.clientX - r.left, y: t.clientY - r.top }; };
+    const onStart = (e: TouchEvent) => {
+      setAnimate(false);
+      const cur = zr.current;
+      if (e.touches.length === 2) {
+        const a = at(e.touches[0]), b = at(e.touches[1]);
+        start = { ...cur, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2, d: Math.hypot(a.x - b.x, a.y - b.y) || 1, n: 2, moved: true };
+        e.preventDefault();
+      } else if (e.touches.length === 1 && cur.s > 1) {
+        const a = at(e.touches[0]);
+        start = { ...cur, mx: a.x, my: a.y, d: 0, n: 1, moved: false };
+      } else start = null;
+    };
+    const onMove = (e: TouchEvent) => {
+      if (!start) return;
+      if (start.n === 2 && e.touches.length === 2) {
+        const a = at(e.touches[0]), b = at(e.touches[1]);
+        const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+        const s = start.s * (Math.hypot(a.x - b.x, a.y - b.y) / start.d);
+        const px = (start.mx - start.x) / start.s, py = (start.my - start.y) / start.s;
+        setZ(clamp({ s, x: mx - px * s, y: my - py * s }));
+        e.preventDefault();
+      } else if (start.n === 1 && e.touches.length === 1) {
+        const a = at(e.touches[0]);
+        if (!start.moved && Math.hypot(a.x - start.mx, a.y - start.my) < 6) return;
+        start.moved = true;
+        setZ(clamp({ s: start.s, x: start.x + a.x - start.mx, y: start.y + a.y - start.my }));
+        e.preventDefault();
+      }
+    };
+    const onEnd = (e: TouchEvent) => {
+      if (e.touches.length === 0 || (start?.n === 2 && e.touches.length < 2)) start = null;
+    };
+    el.addEventListener('touchstart', onStart, { passive: false });
+    el.addEventListener('touchmove', onMove, { passive: false });
+    el.addEventListener('touchend', onEnd);
+    el.addEventListener('touchcancel', onEnd);
+    return () => {
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchmove', onMove);
+      el.removeEventListener('touchend', onEnd);
+      el.removeEventListener('touchcancel', onEnd);
+    };
+  }, []);
+
+  function zoomBy(f: number) {
+    const el = box.current!;
+    const cx = el.clientWidth / 2, cy = el.clientHeight / 2;
+    const s = Math.min(MAX_ZOOM, Math.max(1, z.s * f));
+    setAnimate(true);
+    setZ(clamp({ s, x: cx - ((cx - z.x) / z.s) * s, y: cy - ((cy - z.y) / z.s) * s }));
+  }
+
+  const zoomed = z.s > 1.01;
+  return (
+    <div ref={box} class={'zoom-box' + (zoomed ? ' zoomed' : '')}>
+      <div class={'zoom-inner' + (animate ? ' animate' : '')} style={{ transform: `translate(${z.x}px, ${z.y}px) scale(${z.s})` }}>
+        {children}
+      </div>
+      <div class="zoom-btns">
+        <button class="zoom-btn" aria-label="Zoom in" disabled={z.s >= MAX_ZOOM} onClick={() => zoomBy(2)}><IconZoomIn /></button>
+        {zoomed && <button class="zoom-btn" aria-label="Zoom out fully" onClick={() => { setAnimate(true); setZ({ s: 1, x: 0, y: 0 }); }}><IconZoomOut /></button>}
+      </div>
+    </div>
+  );
 }

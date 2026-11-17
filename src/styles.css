@@ -95,6 +95,7 @@
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; background: var(--bg); color: var(--ink); }
+html { touch-action: pan-x pan-y; } /* no pinch or double-tap zoom; only the body diagram zooms */
 body { min-height: 100dvh; overscroll-behavior-y: none; }
 button, input, textarea, select { font: inherit; color: inherit; letter-spacing: inherit; }
 button { cursor: pointer; touch-action: manipulation; }
@@ -403,3 +404,31 @@ textarea.input { min-height: 88px; resize: vertical; }
 .quick-add svg { width: 16px; height: 16px; }
 .screen.has-savebar .sec-head { padding-bottom: 5px; }
 .screen.has-savebar .row-item { min-height: 44px; padding-top: 9px; padding-bottom: 9px; }
+.quick-add button { position: relative; }
+.quick-add button.on { box-shadow: inset 0 0 0 2px var(--accent); }
+.quick-add .count { min-width: 18px; height: 18px; border-radius: 9px; background: var(--accent); color: var(--accent-ink); font-size: 11px; display: inline-grid; place-items: center; padding: 0 5px; }
+.picker { margin-top: 8px; padding: 10px; }
+.mini-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.mini-tile { border: 0; background: var(--fill); border-radius: 12px; padding: 6px 2px 7px; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11.5px; line-height: 1.1; color: var(--ink); text-align: center; }
+.mini-tile svg { width: 34px; height: 34px; color: var(--ink-2); }
+.mini-tile:active, .add-chip:active { background: var(--accent-soft); }
+.chip.add-chip { color: var(--ink); }
+.row-icon.small { width: 24px; height: 24px; border-radius: 6px; }
+.row-icon.small svg { width: 15px; height: 15px; }
+.item-name { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.input.dose { width: 96px; min-height: 32px; padding: 5px 10px; font-size: 16px; flex: none; }
+.pick-label { width: 40px; flex: none; font-size: 12px; color: var(--muted); }
+
+/* ---------- diagram zoom ---------- */
+.zoom-box { position: relative; overflow: hidden; border-radius: 10px; touch-action: pan-y; }
+.zoom-box.zoomed { touch-action: none; background: var(--surface-2); }
+.zoom-inner { transform-origin: 0 0; will-change: transform; }
+.zoom-inner.animate { transition: transform 0.25s ease; }
+.zoom-btns { position: absolute; top: 4px; right: 4px; display: flex; flex-direction: column; gap: 6px; }
+.zoom-btn { width: 34px; height: 34px; border-radius: 50%; border: 0; background: color-mix(in srgb, var(--surface) 88%, transparent); box-shadow: 0 1px 4px rgba(0,0,0,.18); color: var(--accent); display: grid; place-items: center; padding: 0; }
+.zoom-btn svg { width: 19px; height: 19px; stroke-width: 2.2; }
+.zoom-btn:disabled { opacity: 0.35; }
+.quick-add { gap: 6px; }
+.quick-add button { padding: 8px 4px; gap: 5px; font-size: 13.5px; min-width: 0; white-space: nowrap; }
+.quick-add span { width: 22px; height: 22px; border-radius: 6px; flex: none; }
+.quick-add svg { width: 14px; height: 14px; }
