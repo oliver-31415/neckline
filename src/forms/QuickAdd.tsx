@@ -23,9 +23,12 @@ export interface Item {
 }
 
 const HELD = [5, 15, 30, 60, 120, 180];
-const DONE_FOR = [2, 5, 10, 15, 30, 45];
+const DONE_FOR = [10, 20, 30, 45, 60, 90, 120];
 const HOLDS = [5, 10, 20, 30, 60];
 const TAKEN = [{ v: 0, label: 'Now' }, { v: 0.5, label: '30 min' }, { v: 1, label: '1 h' }, { v: 2, label: '2 h' }, { v: 4, label: '4 h' }];
+
+/** Stretch-type exercises also get a "hold" row. */
+const hasHolds = (name: string) => /stretch|physio|yoga|pilates|tuck|glide|hold/i.test(name);
 
 export function exerciseDose(minutes: number | null | undefined, hold: number | null | undefined) {
   return [minutes ? `${minutes} min` : '', hold ? `${hold} s holds` : ''].filter(Boolean).join(', ');
@@ -69,6 +72,7 @@ export function SinceLast({ items, onChange }: { items: Item[]; onChange: (items
   const s = settings.value;
   const [open, setOpen] = useState<Kind | null>(null);
   const [medName, setMedName] = useState('');
+  const [exName, setExName] = useState('');
   const add = (it: Omit<Item, 'key'>) => { onChange([...items, { ...it, key: uid() }]); navigator.vibrate?.(8); };
   const update = (key: string, patch: Partial<Item>) => onChange(items.map((x) => (x.key === key ? { ...x, ...patch } : x)));
   const meds = s.treatments.filter((t) => t.kind === 'medication');
@@ -99,10 +103,15 @@ export function SinceLast({ items, onChange }: { items: Item[]; onChange: (items
             </div>
           )}
           {open === 'exercise' && (
-            <div class="chips">
-              {s.exercises.map((x) => <button key={x} class="chip add-chip" onClick={() => add({ kind: 'exercise', name: x })}>+ {x}</button>)}
-              <button class="chip add" onClick={() => { const v = prompt('Exercise')?.trim(); if (v) { rememberChip('exercises', v); add({ kind: 'exercise', name: v }); } }}>Other…</button>
-            </div>
+            <>
+              <div class="chips">
+                {s.exercises.map((x) => <button key={x} class="chip add-chip" onClick={() => add({ kind: 'exercise', name: x })}>+ {x}</button>)}
+              </div>
+              <form class="row" onSubmit={(e) => { e.preventDefault(); const v = exName.trim(); if (v) { rememberChip('exercises', v); add({ kind: 'exercise', name: v }); setExName(''); } }}>
+                <input class="input grow" placeholder="Other exercise" value={exName} autocomplete="off" onInput={(e) => setExName((e.target as HTMLInputElement).value)} />
+                <button class="btn sm" type="submit" disabled={!exName.trim()}>Add</button>
+              </form>
+            </>
           )}
           {open === 'med' && (
             <>
@@ -139,8 +148,8 @@ export function SinceLast({ items, onChange }: { items: Item[]; onChange: (items
                 )}
                 {it.kind === 'exercise' && (
                   <>
-                    <div class="arow-line"><span class="pick-label">For</span><Pick options={DONE_FOR.map((m) => ({ v: m, label: `${m} min` }))} value={it.minutes} onChange={(minutes) => update(it.key, { minutes })} /></div>
-                    <div class="arow-line"><span class="pick-label">Hold</span><Pick options={HOLDS.map((x) => ({ v: x, label: `${x} s` }))} value={it.hold} onChange={(hold) => update(it.key, { hold })} /></div>
+                    <div class="arow-line"><span class="pick-label">For</span><Pick options={DONE_FOR.map((m) => ({ v: m, label: fmtMinutes(m) }))} value={it.minutes} onChange={(minutes) => update(it.key, { minutes })} /></div>
+                    {hasHolds(it.name) && <div class="arow-line"><span class="pick-label">Hold</span><Pick options={HOLDS.map((x) => ({ v: x, label: `${x} s` }))} value={it.hold} onChange={(hold) => update(it.key, { hold })} /></div>}
                   </>
                 )}
                 {it.kind === 'med' && (

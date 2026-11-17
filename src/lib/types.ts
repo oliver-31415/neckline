@@ -114,4 +114,6 @@ export interface Settings {
   theme: 'system' | 'light' | 'dark';
   push: { serverUrl: string; token: string; enabled: boolean };
   onboarded: boolean;
+  /** Bumped when default lists change, so stored settings can be upgraded once. */
+  version?: number;
 }

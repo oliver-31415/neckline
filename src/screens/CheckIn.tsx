@@ -2,7 +2,7 @@ import { useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { entries, rememberChip, removeEntry, saveEntry, settings, uid } from '../lib/store';
 import { closeSheet, go, openSheet, pendingSlot } from '../lib/nav';
-import { AREA_KINDS, DURATIONS, IMPACTS, painWord } from '../lib/catalog';
+import { AREA_KINDS, DURATIONS, IMPACTS, MAIN_SYMPTOMS } from '../lib/catalog';
 import { ago, fmtSlot, fmtTime } from '../lib/time';
 import { slotStatus } from '../lib/env';
 import type { Level, PainEntry, Sensation } from '../lib/types';
@@ -13,7 +13,9 @@ import { ActivityTiles } from '../forms/common';
 import { SinceLast, itemsToEntries, type Item } from '../forms/QuickAdd';
 
 type Draft = Omit<PainEntry, 'intensity'> & { intensity: number | null | undefined; levels: Record<string, number>; kinds: Record<string, Sensation[]> };
-type Detail = 'time' | 'duration' | 'impact' | 'context' | 'note';
+type Detail = 'time' | 'trend' | 'duration' | 'impact' | 'context' | 'note';
+
+const TRENDS = [{ v: 'better', label: 'Better' }, { v: 'same', label: 'Same' }, { v: 'worse', label: 'Worse' }] as const;
 
 const blank = (): Draft => ({
   id: uid(), type: 'pain', mode: 'checkin', time: Date.now(), createdAt: 0, updatedAt: 0,
@@ -35,6 +37,49 @@ function KindChips({ value, onChange }: { value: Sensation[]; onChange: (v: Sens
   );
 }
 
+/** Headache and migraine as chips; every other symptom is picked from a dropdown or typed in. */
+function SymptomPicker({ options, value, onChange }: { options: string[]; value: string[]; onChange: (v: string[]) => void }) {
+  const [typing, setTyping] = useState(false);
+  const [text, setText] = useState('');
+  const shown = [...MAIN_SYMPTOMS, ...value.filter((v) => !MAIN_SYMPTOMS.includes(v))];
+  const rest = options.filter((o) => !shown.includes(o));
+  const toggle = (o: string) => onChange(value.includes(o) ? value.filter((x) => x !== o) : [...value, o]);
+  function commit() {
+    const t = text.trim();
+    if (t) { rememberChip('symptoms', t); if (!value.includes(t)) onChange([...value, t]); }
+    setText('');
+    setTyping(false);
+  }
+  return (
+    <div class="chips">
+      {shown.map((o) => (
+        <button key={o} class={'chip' + (value.includes(o) ? ' on' : '')} aria-pressed={value.includes(o)} onClick={() => toggle(o)}>{o}</button>
+      ))}
+      {typing ? (
+        <input class="input chip-input" autoFocus value={text} placeholder="Symptom" onInput={(e) => setText((e.target as HTMLInputElement).value)} onKeyDown={(e) => e.key === 'Enter' && commit()} onBlur={commit} />
+      ) : (
+        <label class="chip add select-chip">
+          <IconPlus /> Other
+          <select
+            aria-label="Other symptom" value=""
+            onChange={(e) => {
+              const el = e.target as HTMLSelectElement;
+              const v = el.value;
+              el.value = '';
+              if (v === '__new') setTyping(true);
+              else if (v) onChange([...value, v]);
+            }}
+          >
+            <option value="" disabled>Other symptom</option>
+            {rest.map((o) => <option key={o} value={o}>{o}</option>)}
+            <option value="__new">New…</option>
+          </select>
+        </label>
+      )}
+    </div>
+  );
+}
+
 /** Home screen: rate pain, tap where it is, save. Also used (in a sheet) to edit a past check-in. */
 export function CheckIn({ entry }: { entry?: PainEntry }) {
   const s = settings.value;
@@ -50,7 +95,7 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
   const set = (p: Partial<Draft>) => setD({ ...d, ...p });
 
   const regionIds = Object.keys(d.regions);
-  const painTouched = d.intensity !== undefined || regionIds.length > 0 || d.qualities.length + d.symptoms.length + d.postures.length + d.activities.length > 0 || !!d.note || !!d.duration || Object.values(d.impacts).some((v) => v != null);
+  const painTouched = d.trend != null || regionIds.length > 0 || d.qualities.length + d.symptoms.length + d.postures.length + d.activities.length > 0 || !!d.note || !!d.duration || Object.values(d.impacts).some((v) => v != null);
   const touched = painTouched || extras.length > 0;
 
   /** Move a marked vertebra up (-1) or down (+1) the spine, keeping its level and sensation. */
@@ -75,7 +120,7 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
     const levels = { ...d.levels };
     const kinds = { ...d.kinds };
     if (regions[id]) { delete regions[id]; delete levels[id]; delete kinds[id]; }
-    else { regions[id] = 'pain'; levels[id] = d.intensity ?? 5; kinds[id] = []; }
+    else { regions[id] = 'pain'; levels[id] = 5; kinds[id] = []; }
     set({ regions, levels, kinds });
     navigator.vibrate?.(8);
   }
@@ -83,9 +128,11 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
   async function save() {
     const pains = entries.value.filter((e): e is PainEntry => e.type === 'pain');
     const slot = editing ? d.slot : pendingSlot.value ?? s.checkinTimes.find((t) => slotStatus(t, pains) === 'due') ?? null;
+    // Overall pain is the worst marked area; older entries without area levels keep their own.
+    const lv = Object.values(d.levels);
     const out: PainEntry = {
       ...d,
-      intensity: d.intensity === undefined ? null : d.intensity,
+      intensity: lv.length ? Math.max(...lv) : d.intensity ?? null,
       time: timeSet ? d.time : Date.now(),
       slot: d.mode === 'checkin' ? slot : null,
     };
@@ -106,28 +153,6 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
 
   const body = (
     <>
-      <section class="section">
-        <div class="group">
-          <div class="srow">
-            <div class="srow-top">
-              <span class="srow-label">Pain</span>
-              <span class="srow-value">
-                {d.intensity === undefined
-                  ? <button class="link" onClick={() => set({ intensity: null })}>Not sure</button>
-                  : d.intensity === null ? <button class="link" onClick={() => set({ intensity: undefined })}>Not sure ✓</button>
-                  : <><span>{painWord(d.intensity)}</span><PainPill n={d.intensity} /></>}
-              </span>
-            </div>
-            <PainSlider value={d.intensity} onChange={(intensity) => set({ intensity })} label="Pain" />
-            <Seg
-              options={[{ v: 'better', label: 'Better' }, { v: 'same', label: 'Same' }, { v: 'worse', label: 'Worse' }]}
-              value={d.trend ?? null}
-              onChange={(trend) => set({ trend: trend as Draft['trend'], mode: trend === 'better' || trend === 'worse' ? 'change' : 'checkin' })}
-            />
-          </div>
-        </div>
-      </section>
-
       {s.steps.where && (
         <section class="section">
           <div class="group pad tight">
@@ -161,7 +186,7 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
         <section class="section">
           <div class="sec-head"><span>Symptoms</span></div>
           <div class="group pad">
-            <Chips options={s.symptoms} value={d.symptoms} onChange={(symptoms) => set({ symptoms })} onAdd={(v) => rememberChip('symptoms', v)} />
+            <SymptomPicker options={s.symptoms} value={d.symptoms} onChange={(symptoms) => set({ symptoms })} />
           </div>
         </section>
       )}
@@ -173,6 +198,13 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
         <div class="group">
           <Expand id="time" open={open} setOpen={setOpen} label="Time" value={timeSet ? fmtTime(d.time) : 'Now'} isSet={timeSet}>
             <WhenPicker value={d.time} onChange={(time) => { set({ time }); setTimeSet(true); }} />
+          </Expand>
+          <Expand id="trend" open={open} setOpen={setOpen} label="Since last time" value={TRENDS.find((t) => t.v === d.trend)?.label ?? ''}>
+            <Seg
+              options={TRENDS.map((t) => ({ ...t }))}
+              value={d.trend ?? null}
+              onChange={(trend) => set({ trend: trend as Draft['trend'], mode: trend === 'better' || trend === 'worse' ? 'change' : 'checkin' })}
+            />
           </Expand>
           {s.steps.duration && (
             <Expand id="duration" open={open} setOpen={setOpen} label="How long it lasts" value={d.duration ?? ''}>

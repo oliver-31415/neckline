@@ -1,6 +1,10 @@
 import type { Sensation, Settings, StepId } from './types';
 
 export const POSTURES: Record<string, { label: string; hint: string }> = {
+  couch: { label: 'Sitting on couch', hint: '' },
+  office: { label: 'Office chair', hint: '' },
+  car: { label: 'In the car', hint: '' },
+  standing: { label: 'Standing', hint: '' },
   neutral: { label: 'Mostly neutral', hint: 'Head balanced, looking ahead' },
   down: { label: 'Looking down', hint: 'Phone, reading, cooking' },
   up: { label: 'Looking up', hint: 'Shelves, ceilings, screens up high' },
@@ -23,10 +27,16 @@ export const DEFAULT_ACTIVITIES = [
   'Computer', 'Phone', 'Driving', 'Lifting', 'Exercise', 'Walking', 'Housework', 'Reading', 'Rest',
 ];
 
-export const DEFAULT_EXERCISES = [
+export const DEFAULT_EXERCISES = ['Walk', 'Run', 'Cycle', 'Swim', 'Gym', 'Yoga / Pilates', 'Stretches', 'Physio exercises'];
+
+/** The first version's exercise list, replaced on upgrade (custom additions are kept). */
+export const OLD_EXERCISES = [
   'Chin tucks', 'Neck rotations', 'Shoulder rolls', 'Shoulder blade squeezes', 'Upper trap stretch',
   'Levator stretch', 'Nerve glides', 'Walking', 'Physio programme',
 ];
+
+/** Symptoms always shown as their own chips; the rest are picked from "Other". */
+export const MAIN_SYMPTOMS = ['Headache', 'Migraine'];
 
 export const DEFAULT_QUALITIES = [
   'Aching', 'Burning', 'Sharp', 'Stabbing', 'Throbbing', 'Tingling', 'Numb', 'Stiff', 'Shooting', 'Pressure',
@@ -103,6 +113,7 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
   push: { serverUrl: '', token: '', enabled: false },
   onboarded: false,
+  version: 2,
 };
 
 export function painWord(n: number | null): string {

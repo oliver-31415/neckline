@@ -111,6 +111,32 @@ export const POSTURE_ART: Record<string, () => preact.JSX.Element> = {
       <circle cx="13" cy="23" r="6" /><path d="M19 27h22l2 4" />
     </P>
   ),
+  couch: () => (
+    <P>
+      <path d="M8 31v-9a3 3 0 0 1 6 0v8h26v-8a3 3 0 0 0-3-3H17" stroke-width="2" opacity="0.6" />
+      <path d="M5 31h38v7H5zM9 38v4M39 38v4" stroke-width="2" />
+      <circle cx="20" cy="10" r="4.5" /><path d="M21 15l3 11h11l1 4" />
+    </P>
+  ),
+  office: () => (
+    <P>
+      <path d="M33 6v22M13 28h22M24 28v9M15 42l9-5 9 5" stroke-width="2" opacity="0.6" />
+      <circle cx="14" cy="42" r="1.5" stroke-width="2" /><circle cx="34" cy="42" r="1.5" stroke-width="2" />
+      <circle cx="24" cy="8" r="4.5" /><path d="M26 13l3 12H15l-1 10" />
+    </P>
+  ),
+  car: () => (
+    <P>
+      <path d="M38 14l-5 18H12" stroke-width="2" opacity="0.6" />
+      <circle cx="11" cy="20" r="5" stroke-width="2" /><path d="M11 15v10" stroke-width="2" />
+      <circle cx="30" cy="9" r="4.5" /><path d="M29 14l2 14H17l-2 12M29 18l-14 2" />
+    </P>
+  ),
+  standing: () => (
+    <P>
+      <circle cx="24" cy="8" r="4.5" /><path d="M24 13v16M24 17l-7 9M24 17l7 9M24 29l-5 14M24 29l5 14" />
+    </P>
+  ),
 };
 export const IconPulse = () => <I><path d="M3 12h4l2.5-6 4 12 2.5-6H21" /></I>;
 export const IconExercise = () => <I><path d="M4 9v6M7 7v10M17 7v10M20 9v6M7 12h10" /></I>;
