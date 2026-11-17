@@ -2,37 +2,35 @@ import { useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { entries, rememberChip, removeEntry, saveEntry, settings, uid } from '../lib/store';
 import { closeSheet, go, openSheet, pendingSlot } from '../lib/nav';
-import { DURATIONS, IMPACTS } from '../lib/catalog';
+import { AREA_KINDS, DURATIONS, IMPACTS } from '../lib/catalog';
 import { ago, fmtSlot, fmtTime } from '../lib/time';
-import { isIOS, isStandalone, slotStatus } from '../lib/env';
+import { slotStatus } from '../lib/env';
 import type { Level, PainEntry, Sensation } from '../lib/types';
 import { BodyMap, SPINE, regionLabel } from '../components/BodyMap';
 import { Chips, Nav, PainPill, Seg, Sheet, SliderRow, WhenPicker, showToast } from '../components/ui';
-import { IconChevron, IconClose, IconDownChev, IconExercise, IconGear, IconPill, IconPlus, IconPosture, IconShare, IconUpChev } from '../components/Icons';
+import { IconChevron, IconClose, IconDownChev, IconExercise, IconGear, IconPill, IconPlus, IconPosture, IconUpChev } from '../components/Icons';
 import { ActivityTiles } from '../forms/common';
 import { QuickExercise, QuickMed, QuickPosture, extraSummary, type Extra } from '../forms/QuickAdd';
 
-type Draft = Omit<PainEntry, 'intensity'> & { intensity: number | null | undefined; levels: Record<string, number> };
-type Detail = 'time' | 'quality' | 'duration' | 'impact' | 'symptoms' | 'context' | 'note';
+type Draft = Omit<PainEntry, 'intensity'> & { intensity: number | null | undefined; levels: Record<string, number>; kinds: Record<string, Sensation[]> };
+type Detail = 'time' | 'duration' | 'impact' | 'context' | 'note';
 
 const blank = (): Draft => ({
   id: uid(), type: 'pain', mode: 'checkin', time: Date.now(), createdAt: 0, updatedAt: 0,
-  intensity: undefined, trend: null, regions: {}, levels: {}, qualities: [], duration: null, impacts: {},
+  intensity: undefined, trend: null, regions: {}, levels: {}, kinds: {}, qualities: [], duration: null, impacts: {},
   symptoms: [], postures: [], activities: [], slot: null, note: '',
 });
 
-const SENSATIONS: Sensation[] = ['pain', 'tingling', 'numb'];
-const SENSATION_NAME: Record<Sensation, string> = { pain: 'Pain', tingling: 'Tingling', numb: 'Numb' };
-
-/** Small segmented pill: what this area feels like. */
-function SensationPill({ value, onChange }: { value: Sensation; onChange: (s: Sensation) => void }) {
+/** Multi-select: what this area feels like. */
+function KindChips({ value, onChange }: { value: Sensation[]; onChange: (v: Sensation[]) => void }) {
   return (
-    <div class="sens" role="radiogroup" aria-label="Feels like">
-      {SENSATIONS.map((x) => (
-        <button key={x} role="radio" aria-checked={value === x} class={'sens-opt ' + x + (value === x ? ' on' : '')} onClick={() => onChange(x)}>
-          <i />{SENSATION_NAME[x]}
-        </button>
-      ))}
+    <div class="kinds">
+      {AREA_KINDS.map((k) => {
+        const on = value.includes(k.id);
+        return (
+          <button key={k.id} class={'kind' + (on ? ' on' : '')} aria-pressed={on} onClick={() => onChange(on ? value.filter((x) => x !== k.id) : [...value, k.id])}>{k.label}</button>
+        );
+      })}
     </div>
   );
 }
@@ -41,7 +39,11 @@ function SensationPill({ value, onChange }: { value: Sensation; onChange: (s: Se
 export function CheckIn({ entry }: { entry?: PainEntry }) {
   const s = settings.value;
   const editing = !!entry;
-  const [d, setD] = useState<Draft>(() => (entry ? { ...entry, levels: entry.levels ?? {} } : blank()));
+  const [d, setD] = useState<Draft>(() => (entry ? {
+    ...entry,
+    levels: entry.levels ?? {},
+    kinds: entry.kinds ?? Object.fromEntries(Object.entries(entry.regions).map(([k, v]) => [k, [v]])),
+  } : blank()));
   const [timeSet, setTimeSet] = useState(editing);
   const [open, setOpen] = useState<Detail | null>(null);
   const [extras, setExtras] = useState<Extra[]>([]);
@@ -59,20 +61,23 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
     if (i < 0 || i >= SPINE.length || d.regions[to]) return;
     const regions: Draft['regions'] = {};
     const levels: Draft['levels'] = {};
+    const kinds: Draft['kinds'] = {};
     for (const k of Object.keys(d.regions)) {
       const nk = k === id ? to : k;
       regions[nk] = d.regions[k];
       if (d.levels[k] != null) levels[nk] = d.levels[k];
+      if (d.kinds[k]) kinds[nk] = d.kinds[k];
     }
-    set({ regions, levels });
+    set({ regions, levels, kinds });
   }
 
   function tapRegion(id: string) {
     const regions = { ...d.regions };
     const levels = { ...d.levels };
-    if (regions[id]) { delete regions[id]; delete levels[id]; }
-    else { regions[id] = 'pain'; levels[id] = d.intensity ?? 5; }
-    set({ regions, levels });
+    const kinds = { ...d.kinds };
+    if (regions[id]) { delete regions[id]; delete levels[id]; delete kinds[id]; }
+    else { regions[id] = 'pain'; levels[id] = d.intensity ?? 5; kinds[id] = []; }
+    set({ regions, levels, kinds });
     navigator.vibrate?.(8);
   }
 
@@ -126,7 +131,7 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
 
       {s.steps.where && (
         <section class="section">
-          <div class="sec-head"><span>Where</span><span class="sec-aside">tap the body to mark it</span></div>
+          <div class="sec-head"><span>Where</span></div>
           <div class="group pad">
             <BodyMap value={d.regions} levels={d.levels} onTap={tapRegion} incision={s.incision} />
           </div>
@@ -149,7 +154,7 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
                     <button class="x-btn" aria-label={`Remove ${regionLabel(id)}`} onClick={() => tapRegion(id)}><IconClose /></button>
                   </>}
                 >
-                  <SensationPill value={d.regions[id]} onChange={(v) => set({ regions: { ...d.regions, [id]: v } })} />
+                  <KindChips value={d.kinds[id] ?? []} onChange={(ks) => set({ kinds: { ...d.kinds, [id]: ks }, regions: { ...d.regions, [id]: ks[0] ?? 'pain' } })} />
                 </SliderRow>
               ))}
             </div>
@@ -157,9 +162,18 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
         </section>
       )}
 
+      {s.steps.symptoms && (
+        <section class="section">
+          <div class="sec-head"><span>Symptoms</span></div>
+          <div class="group pad">
+            <Chips options={s.symptoms} value={d.symptoms} onChange={(symptoms) => set({ symptoms })} onAdd={(v) => rememberChip('symptoms', v)} />
+          </div>
+        </section>
+      )}
+
       {!editing && (
         <section class="section">
-          <div class="sec-head"><span>Since your last check-in</span><span class="sec-aside">optional</span></div>
+          <div class="sec-head"><span>Since your last check-in</span></div>
           <div class="quick-add">
             <button onClick={() => setAdding('posture')}><span style={{ background: 'var(--posture)' }}><IconPosture /></span>Posture</button>
             <button onClick={() => setAdding('med')}><span style={{ background: 'var(--treatment)' }}><IconPill /></span>Medication</button>
@@ -188,16 +202,11 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
       {adding === 'exercise' && <QuickExercise onClose={() => setAdding(null)} onAdd={(x) => { setExtras([...extras, x]); setAdding(null); }} />}
 
       <section class="section">
-        <div class="sec-head"><span>Details</span><span class="sec-aside">optional</span></div>
+        <div class="sec-head"><span>Details</span></div>
         <div class="group">
           <Expand id="time" open={open} setOpen={setOpen} label="Time" value={timeSet ? fmtTime(d.time) : 'Now'}>
             <WhenPicker value={d.time} onChange={(time) => { set({ time }); setTimeSet(true); }} />
           </Expand>
-          {s.steps.quality && (
-            <Expand id="quality" open={open} setOpen={setOpen} label="Feels like" value={d.qualities.join(', ')}>
-              <Chips options={s.qualities} value={d.qualities} onChange={(qualities) => set({ qualities })} onAdd={(v) => rememberChip('qualities', v)} />
-            </Expand>
-          )}
           {s.steps.duration && (
             <Expand id="duration" open={open} setOpen={setOpen} label="How long it lasts" value={d.duration ?? ''}>
               <Chips single options={DURATIONS} value={d.duration ? [d.duration] : []} onChange={(v) => set({ duration: v[0] ?? null })} />
@@ -215,11 +224,6 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
               </div>
             </Expand>
           )}
-          {s.steps.symptoms && (
-            <Expand id="symptoms" open={open} setOpen={setOpen} label="Other symptoms" value={d.symptoms.join(', ')}>
-              <Chips options={s.symptoms} value={d.symptoms} onChange={(symptoms) => set({ symptoms })} onAdd={(v) => rememberChip('symptoms', v)} />
-            </Expand>
-          )}
           {s.steps.context && (
             <Expand id="context" open={open} setOpen={setOpen} label="Activities" value={d.activities.join(', ')}>
               <ActivityTiles options={s.activities} value={d.activities} onChange={(activities) => set({ activities })} onAdd={(v) => rememberChip('activities', v)} />
@@ -227,7 +231,7 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
           )}
           {s.steps.note && (
             <Expand id="note" open={open} setOpen={setOpen} label="Note" value={d.note}>
-              <textarea class="input" placeholder="Anything to remember for your clinician" value={d.note} onInput={(e) => set({ note: (e.target as HTMLTextAreaElement).value })} />
+              <textarea class="input"  value={d.note} onInput={(e) => set({ note: (e.target as HTMLTextAreaElement).value })} />
             </Expand>
           )}
         </div>
@@ -256,9 +260,6 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
         <button class="nav-btn" aria-label="Log something else" onClick={() => openSheet('add')}><IconPlus /></button>
         <button class="nav-btn" aria-label="Settings" onClick={() => go('settings')}><IconGear /></button>
       </Nav>
-      {isIOS && !isStandalone() && (
-        <div class="banner"><IconShare /><span>Tap <b>Share → Add to Home Screen</b> to install. Data saved in Safari stays in Safari.</span></div>
-      )}
       {body}
       <div class="savebar">
         <button class="btn primary wide" disabled={!touched} onClick={save}>
@@ -277,7 +278,7 @@ function ModeSwitch({ mode, onChange }: { mode: PainEntry['mode']; onChange: (m:
 
 function LastReading() {
   const last = [...entries.value].reverse().find((e): e is PainEntry => e.type === 'pain');
-  if (!last) return <>Rate your pain and tap where you feel it.</>;
+  if (!last) return null;
   return (
     <button class="last" onClick={() => go('history')}>
       Last: <PainPill n={last.intensity} /> {ago(last.time)}

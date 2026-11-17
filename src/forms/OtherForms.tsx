@@ -23,7 +23,7 @@ function DurationChips({ value, onChange }: { value: number | null; onChange: (m
 
 function Note({ value, onChange }: { value?: string; onChange: (v: string) => void }) {
   return (
-    <Block title="Note" aside="optional">
+    <Block title="Note">
       <textarea class="input" style={{ minHeight: 64 }} value={value} onInput={(e) => onChange((e.target as HTMLTextAreaElement).value)} />
     </Block>
   );
@@ -39,7 +39,6 @@ export function PostureForm({ entry }: { entry?: PostureEntry }) {
       <WhenPicker value={d.time} onChange={(time) => set({ time })} />
       <Block title="How was your head and neck mostly?">
         <PostureTiles single options={settings.value.postures} value={d.posture ? [d.posture] : []} onChange={(v) => set({ posture: v[0] ?? '' })} />
-        {d.posture && <p class="small muted">{POSTURES[d.posture]?.hint}</p>}
       </Block>
       <Block title="Roughly how long?">
         <DurationChips value={d.minutes} onChange={(minutes) => set({ minutes })} />
@@ -48,7 +47,6 @@ export function PostureForm({ entry }: { entry?: PostureEntry }) {
         <Seg options={[{ v: 'yes', label: 'Yes' }, { v: 'some', label: 'A few' }, { v: 'no', label: 'No' }]} value={d.breaks} onChange={(breaks) => set({ breaks })} />
       </Block>
       <Note value={d.note} onChange={(note) => set({ note })} />
-      <p class="small muted center">A rough self-report is more useful than a precise-looking guess. Phones can’t measure neck angle.</p>
       <DeleteRow isNew={isNew} id={d.id} />
     </Sheet>
   );
@@ -111,10 +109,10 @@ export function MealForm({ entry }: { entry?: MealEntry }) {
   return (
     <Sheet title="Food & Drink" onClose={closeSheet} tall action={{ label: isNew ? 'Add' : 'Save', onClick: save }}>
       <WhenPicker value={d.time} onChange={(time) => set({ time })} />
-      <Block title="Quick tags" aside="optional">
+      <Block title="Quick tags">
         <Chips options={settings.value.mealTags} value={d.tags} onChange={(tags) => set({ tags })} onAdd={(v) => rememberChip('mealTags', v)} />
       </Block>
-      <Block title="Photo" aside="stays on this phone">
+      <Block title="Photo">
         <label class="photo-drop">
           {photo ? <img src={photo.url} alt="Meal photo" /> : <span class="row"><span style={{ width: 24, height: 24 }}><IconCamera /></span> Add a photo</span>}
           <input type="file" accept="image/*" onChange={async (e) => {
@@ -127,10 +125,9 @@ export function MealForm({ entry }: { entry?: MealEntry }) {
         </label>
         {photo && <button class="link" onClick={() => { setPhoto(null); set({ photoId: null }); }}>Remove photo</button>}
       </Block>
-      <Block title="What did you have?" aside="optional">
-        <textarea class="input" style={{ minHeight: 64 }} placeholder="e.g. pasta, coffee, a big lunch" value={d.note} onInput={(e) => set({ note: (e.target as HTMLTextAreaElement).value })} />
+      <Block title="What did you have?">
+        <textarea class="input" style={{ minHeight: 64 }} value={d.note} onInput={(e) => set({ note: (e.target as HTMLTextAreaElement).value })} />
       </Block>
-      <p class="small muted center">Logging food doesn’t assume it affects your pain. It just makes it possible to check later.</p>
       <DeleteRow isNew={isNew} id={d.id} />
     </Sheet>
   );
@@ -155,7 +152,7 @@ export function TreatmentForm({ entry }: { entry?: TreatmentEntry }) {
     <Sheet title="Treatment" onClose={closeSheet} tall action={{ label: isNew ? 'Add' : 'Save', onClick: save }}>
       <WhenPicker value={d.time} onChange={(time) => set({ time })} />
       {isNew && s.treatments.length > 0 && (
-        <Block title="Your usual" aside="tap to fill in">
+        <Block title="Your usual">
           <div class="chips">
             {s.treatments.map((t) => (
               <button key={t.name} class={'chip' + (d.name === t.name ? ' on' : '')} onClick={() => set({ name: t.name, kind: t.kind, dose: t.dose ?? '' })}>
@@ -169,17 +166,17 @@ export function TreatmentForm({ entry }: { entry?: TreatmentEntry }) {
         <Chips single options={TREATMENT_KINDS.map((k) => k.id)} labels={Object.fromEntries(TREATMENT_KINDS.map((k) => [k.id, k.label]))} value={[d.kind]} onChange={(v) => set({ kind: v[0] ?? 'other' })} />
       </Block>
       <Block title="Details">
-        <label class="field"><span>{d.kind === 'medication' ? 'Medication name' : 'Name (optional)'}</span>
+        <label class="field"><span>{d.kind === 'medication' ? 'Medication name' : 'Name'}</span>
           <input class="input" value={d.name} placeholder={d.kind === 'medication' ? 'e.g. Ibuprofen' : kindLabel} autocomplete="off" onInput={(e) => set({ name: (e.target as HTMLInputElement).value })} />
         </label>
         <label class="field"><span>{d.kind === 'medication' ? 'Dose' : 'Amount / duration'}</span>
           <input class="input" value={d.dose} placeholder={d.kind === 'medication' ? 'e.g. 400 mg' : 'e.g. 15 min'} autocomplete="off" onInput={(e) => set({ dose: (e.target as HTMLInputElement).value })} />
         </label>
       </Block>
-      <Block title="Did it seem to help?" aside="you can answer later">
+      <Block title="Did it seem to help?">
         <Chips single options={Object.keys(HELPED_LABELS)} labels={HELPED_LABELS} value={d.helped ? [d.helped] : []} onChange={(v) => set({ helped: (v[0] as Helped) ?? null })} />
       </Block>
-      <Block title="Side effects" aside="optional">
+      <Block title="Side effects">
         <Chips options={s.sideEffects} value={d.sideEffects} onChange={(sideEffects) => set({ sideEffects })} onAdd={(v) => rememberChip('sideEffects', v)} />
       </Block>
       <Note value={d.note} onChange={(note) => set({ note })} />

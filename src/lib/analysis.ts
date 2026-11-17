@@ -1,6 +1,10 @@
 import { POSTURES } from './catalog';
 import { DAY, HOUR, dayKey, startOfDay } from './time';
-import type { DayEntry, Entry, PainEntry, TreatmentEntry } from './types';
+import type { DayEntry, Entry, PainEntry, Sensation, TreatmentEntry } from './types';
+
+export const KIND_LABEL: Record<Sensation, string> = {
+  ache: 'Ache', nerve: 'Sharp nerve pain', tingling: 'Tingling', cramp: 'Cramping', stiff: 'Stiffness', pain: 'Pain', numb: 'Numbness',
+};
 
 /*
  * Pattern helpers. Everything here describes co-occurrence in self-reported data.
@@ -69,13 +73,29 @@ export function countBy(list: string[][]) {
   return [...m.entries()].sort((a, b) => b[1] - a[1]);
 }
 
+/** Types recorded for one area (falls back to the single value older entries stored). */
+export function areaKinds(p: PainEntry, region: string): Sensation[] {
+  const ks = p.kinds?.[region];
+  if (ks) return ks;
+  const v = p.regions[region];
+  return v && v !== 'pain' ? [v] : [];
+}
+
+/** Every pain type in an entry, as display labels (area types plus older free-text qualities). */
+export function entryKindLabels(p: PainEntry): string[] {
+  const out = new Set<string>();
+  for (const r of Object.keys(p.regions)) for (const k of areaKinds(p, r)) out.add(KIND_LABEL[k]);
+  for (const q of p.qualities) out.add(q);
+  return [...out];
+}
+
 export function regionFrequency(pains: PainEntry[]) {
   const withMap = pains.filter((p) => Object.keys(p.regions).length > 0);
   const counts = countBy(withMap.map((p) => Object.keys(p.regions)));
   const sensations: Record<string, Record<string, number>> = {};
-  for (const p of withMap) for (const [r, s] of Object.entries(p.regions)) {
+  for (const p of withMap) for (const r of Object.keys(p.regions)) {
     sensations[r] ??= {};
-    sensations[r][s] = (sensations[r][s] ?? 0) + 1;
+    for (const k of areaKinds(p, r)) sensations[r][k] = (sensations[r][k] ?? 0) + 1;
   }
   return { total: withMap.length, counts, sensations };
 }

@@ -1,4 +1,4 @@
-import type { Settings, StepId } from './types';
+import type { Sensation, Settings, StepId } from './types';
 
 export const POSTURES: Record<string, { label: string; hint: string }> = {
   neutral: { label: 'Mostly neutral', hint: 'Head balanced, looking ahead' },
@@ -32,8 +32,16 @@ export const DEFAULT_QUALITIES = [
   'Aching', 'Burning', 'Sharp', 'Stabbing', 'Throbbing', 'Tingling', 'Numb', 'Stiff', 'Shooting', 'Pressure',
 ];
 
+export const AREA_KINDS: { id: Sensation; label: string }[] = [
+  { id: 'ache', label: 'Ache' },
+  { id: 'nerve', label: 'Sharp nerve pain' },
+  { id: 'tingling', label: 'Tingling' },
+  { id: 'cramp', label: 'Cramping' },
+  { id: 'stiff', label: 'Stiffness' },
+];
+
 export const DEFAULT_SYMPTOMS = [
-  'Headache', 'Dizziness', 'Weakness', 'Muscle spasm', 'Swallowing discomfort', 'Hoarse voice',
+  'Headache', 'Migraine', 'Dizziness', 'Weakness', 'Muscle spasm', 'Swallowing discomfort', 'Hoarse voice',
   'Clumsy hands', 'Fatigue', 'Nausea', 'Jaw pain',
 ];
 
@@ -67,12 +75,11 @@ export const HELPED_LABELS: Record<string, string> = {
 };
 
 export const STEPS: { id: StepId; label: string; hint: string }[] = [
-  { id: 'where', label: 'Body diagram', hint: 'Where you feel it' },
-  { id: 'quality', label: 'What it feels like', hint: 'Aching, burning…' },
+  { id: 'where', label: 'Body diagram', hint: '' },
   { id: 'duration', label: 'How long it lasts', hint: '' },
-  { id: 'impact', label: 'What it’s affecting', hint: 'Sleep, work…' },
-  { id: 'symptoms', label: 'Other symptoms', hint: '' },
-  { id: 'context', label: 'Activities', hint: 'Computer, driving…' },
+  { id: 'impact', label: 'What it’s affecting', hint: '' },
+  { id: 'symptoms', label: 'Symptoms', hint: '' },
+  { id: 'context', label: 'Activities', hint: '' },
   { id: 'note', label: 'Note', hint: '' },
 ];
 

@@ -57,17 +57,12 @@ export function Settings() {
       <button class="back-btn" onClick={() => go('checkin')}><IconBack /> Check In</button>
       <Nav title="Settings" />
 
-      <div class="notice">
-        <IconLock />
-        <div>Everything you log is stored only on this phone. Neckline has no account and no analytics, and it never uploads your diary. Files leave only when you share an export.</div>
-      </div>
-
-      <Block title="About you" aside="used on the PDF">
-        <label class="field"><span>Name (optional)</span><input class="input" value={s.name} onChange={(e) => updateSettings({ name: (e.target as HTMLInputElement).value })} /></label>
-        <label class="field"><span>Surgery date (optional)</span><input type="date" class="input" value={s.surgeryDate} onChange={(e) => updateSettings({ surgeryDate: (e.target as HTMLInputElement).value })} /></label>
+      <Block title="About you">
+        <label class="field"><span>Name</span><input class="input" value={s.name} onChange={(e) => updateSettings({ name: (e.target as HTMLInputElement).value })} /></label>
+        <label class="field"><span>Surgery date</span><input type="date" class="input" value={s.surgeryDate} onChange={(e) => updateSettings({ surgeryDate: (e.target as HTMLInputElement).value })} /></label>
       </Block>
 
-      <Block title="Incision" foot="Adds an “Incision” button under the body diagram.">
+      <Block title="Incision">
         <Seg<string | null>
           options={[{ v: 'front', label: 'Front of neck' }, { v: 'back', label: 'Back of neck' }]}
           value={s.incision?.view ?? null}
@@ -85,15 +80,14 @@ export function Settings() {
           <input type="time" class="input" style={{ width: 140 }} value={newTime} onChange={(e) => setNewTime((e.target as HTMLInputElement).value)} />
           <button class="btn" onClick={() => newTime && setTimes([...s.checkinTimes, newTime])}>Add time</button>
         </div>
-        <p class="small muted">Missed check-ins are simply skipped. Nothing builds up and there are no streaks.</p>
       </Block>
 
-      <Block title="Reminders" aside="optional">
+      <Block title="Reminders">
         <div class="row">
           <span style={{ width: 22, height: 22, color: 'var(--accent)' }}><IconBell /></span>
           <div class="grow">
             <div style={{ fontWeight: 600 }}>Notify me at check-in times</div>
-            <div class="small muted">{!pushSupported() || !isStandalone() ? 'Open Neckline from your Home Screen to use this (iOS 16.4+)' : s.push.enabled ? 'On' : 'Off'}</div>
+            <div class="small muted">{!pushSupported() || !isStandalone() ? 'Home Screen app only' : s.push.enabled ? 'On' : 'Off'}</div>
           </div>
           <Toggle checked={s.push.enabled} label="Reminders" onChange={(v) => !pushBusy && togglePush(v)} />
         </div>
@@ -105,10 +99,9 @@ export function Settings() {
         </label>
         {s.push.enabled && <button class="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => testPush(s.push.serverUrl, s.push.token).then(() => showToast('Test sent')).catch((e) => setPushErr(e.message))}>Send a test reminder</button>}
         {pushErr && <div class="small" style={{ color: 'var(--danger)' }}>{pushErr}</div>}
-        <p class="small muted">The server only knows when to nudge you. It never sees your diary. Setup instructions are in <code>push-server/README.md</code>.</p>
       </Block>
 
-      <Block title="Check-in questions" aside="hide what you don’t need">
+      <Block title="Check-in questions">
         {STEPS.map((st) => (
           <div class="row between" key={st.id}>
             <div><div style={{ fontWeight: 600 }}>{st.label}</div>{st.hint && <div class="small muted">{st.hint}</div>}</div>
@@ -129,7 +122,7 @@ export function Settings() {
         ['mealTags', 'Food tags'],
         ['sideEffects', 'Side effects'],
       ] as [ListKey, string][]).map(([k, label]) => (
-        <Block key={k} title={label} aside="tap to remove">
+        <Block key={k} title={label}>
           <div class="chips">
             {s[k].map((v) => <button key={v} class="chip" onClick={() => removeFrom(k, v)}>{v} <span class="muted">×</span></button>)}
             <AddChip onAdd={(v) => addTo(k, v)} />
@@ -138,7 +131,7 @@ export function Settings() {
       ))}
 
       {s.treatments.length > 0 && (
-        <Block title="Saved treatments" aside="tap to remove">
+        <Block title="Saved treatments">
           <div class="chips">
             {s.treatments.map((t) => <button key={t.name} class="chip" onClick={() => updateSettings({ treatments: s.treatments.filter((x) => x !== t) })}>{t.name}{t.dose ? ` · ${t.dose}` : ''} <span class="muted">×</span></button>)}
           </div>
@@ -150,7 +143,6 @@ export function Settings() {
       </Block>
 
       <Block title="Your data" aside={usage}>
-        <p class="small muted">Back up now and then. If you delete the app from your Home Screen, its data goes too.</p>
         <div class="row between"><span>Include meal photos</span><Toggle checked={withPhotos} label="Include meal photos" onChange={setWithPhotos} /></div>
         <button class="btn wide" onClick={async () => shareOrDownload(await makeBackup(withPhotos))}><IconDownload /> Save a backup file</button>
         <label class="btn wide" style={{ position: 'relative' }}>
@@ -173,7 +165,6 @@ export function Settings() {
         }}><IconTrash /> Delete everything</button>
       </Block>
 
-      <p class="small muted center">Neckline is a diary to help conversations with your clinician. It doesn’t diagnose or give medical advice. If you have new weakness, numbness, trouble walking, swallowing or breathing, or signs of infection, contact your care team or emergency services.</p>
     </div>
   );
 }

@@ -288,13 +288,8 @@ textarea.input { min-height: 88px; resize: vertical; }
 .bodymap-svg { width: 100%; margin: 0 auto; touch-action: manipulation; }
 .bodymap-svg .region { fill: var(--body-fill); stroke: var(--body-stroke); stroke-width: 2; stroke-linejoin: round; cursor: pointer; transition: fill 0.15s; }
 .bodymap-svg .region:active { opacity: 0.75; }
-.bodymap-svg .region.pain { fill: var(--pain); }
-.bodymap-svg .region.tingling { fill: url(#pat-tingling); }
-.bodymap-svg .region.numb { fill: url(#pat-numb); }
 .bodymap-svg .deco { fill: var(--body-fill); opacity: 0.55; pointer-events: none; }
-.bodymap-svg .side-label { fill: var(--muted); font-size: 13px; font-weight: 600; }
-.bodymap-svg .incision { stroke: var(--ink-2); stroke-width: 1.8; stroke-linecap: round; fill: none; pointer-events: none; opacity: 0.7; }
-.bodymap-svg .region.incision-area:not(.pain):not(.tingling):not(.numb) { fill: transparent; stroke: none; }
+.bodymap-svg .head { fill: var(--body-fill); stroke: var(--body-stroke); stroke-width: 2; pointer-events: none; }
 .map-flash { position: absolute; top: 0; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--surface); font-size: 13px; font-weight: 600; padding: 5px 11px; border-radius: 999px; white-space: nowrap; animation: fade 0.15s; pointer-events: none; }
 
 /* ---------- picture tiles ---------- */
@@ -365,24 +360,17 @@ textarea.input { min-height: 88px; resize: vertical; }
 .check.on { background: var(--accent); border-color: var(--accent); }
 .srow.compact .srow-label { font-size: 16px; font-weight: 500; }
 .srow.compact { padding-bottom: 10px; }
-.sens { display: flex; gap: 6px; }
-.sens-opt { border: 0; background: transparent; border-radius: 999px; padding: 4px 10px 4px 8px; font-size: 13px; color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px; min-height: 30px; }
-.sens-opt i { width: 10px; height: 10px; border-radius: 3px; background: var(--fill-strong); }
-.sens-opt.on { background: var(--fill); color: var(--ink); font-weight: 600; }
-.sens-opt.pain.on i { background: var(--pain); }
-.sens-opt.tingling.on i { background: var(--tingling) radial-gradient(circle, rgba(255,255,255,.8) 1px, transparent 1.4px) 0 0 / 4px 4px; }
-.sens-opt.numb.on i { background: var(--numb) repeating-linear-gradient(45deg, rgba(255,255,255,.5) 0 1.5px, transparent 1.5px 4px); }
 .bodymap-panels { position: relative; display: grid; grid-template-columns: 200fr 120fr; gap: 6px; }
+.bodymap-panels.front { grid-template-columns: 120fr 200fr; }
+.bodymap-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.bodymap-foot .seg { width: 132px; }
+.bodymap-foot .chip { min-height: 32px; padding: 5px 12px; font-size: 14px; }
+.kinds { display: flex; flex-wrap: wrap; gap: 6px; }
+.kind { border: 0; background: var(--fill); border-radius: 999px; padding: 5px 11px; font-size: 14px; color: var(--ink); min-height: 30px; }
+.kind.on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
 .bodymap-panels figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.bodymap-panels figcaption { font-size: 12px; color: var(--muted); }
-.bodymap-svg .deco.torso { fill: var(--body-fill); opacity: 0.45; }
 .bodymap-svg .vert { fill: color-mix(in srgb, var(--body-fill) 72%, var(--ink)); transition: fill 0.15s; pointer-events: none; }
-.bodymap-svg .vert.pain { fill: var(--pain); }
-.bodymap-svg .vert.tingling { fill: url(#pat-tingling); }
-.bodymap-svg .vert.numb { fill: url(#pat-numb); }
 .bodymap-svg g[role='button'] { cursor: pointer; }
-.small-chips { justify-content: center; }
-.small-chips .chip { min-height: 32px; padding: 5px 12px; font-size: 14px; }
 .quick-add { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .quick-add button { border: 0; background: var(--surface); border-radius: var(--r); padding: 12px 6px 10px; display: flex; flex-direction: column; align-items: center; gap: 7px; font-size: 14px; font-weight: 500; color: var(--ink); }
 .quick-add button:active { background: var(--fill); }

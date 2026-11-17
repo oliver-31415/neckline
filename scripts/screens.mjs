@@ -33,14 +33,20 @@ function sample() {
       if (t > now || r() < 0.12) continue;
       let v = 3 + (h === 14 && longDown ? 3 : 0) + (h === 9 && poorSleep ? 1.5 : 0) + (r() - 0.5) * 2 - (20 - d) * 0.05;
       v = Math.max(0, Math.min(10, Math.round(v)));
-      const regions = { 'neck-front-R': 'pain', 'shoulder-top-R': 'pain' };
-      if (v >= 5) Object.assign(regions, { 'upper-arm-R': 'pain', 'hand-thumb-R': 'tingling' });
-      if (r() < 0.3) regions['skull-base-R'] = 'pain';
+      const regions = { 'neck-upper-R': 'ache', 'shoulder-top-R': 'stiff' };
+      const kinds = { 'neck-upper-R': ['ache', 'stiff'], 'shoulder-top-R': ['stiff'] };
+      const levels = { 'neck-upper-R': v, 'shoulder-top-R': Math.max(0, v - 1) };
+      if (v >= 5) {
+        Object.assign(regions, { 'upper-arm-R': 'nerve', 'finger-thumb-R': 'tingling', 'finger-index-R': 'tingling', 'spine-C5': 'ache' });
+        Object.assign(kinds, { 'upper-arm-R': ['nerve'], 'finger-thumb-R': ['tingling'], 'finger-index-R': ['tingling'], 'spine-C5': ['ache'] });
+        Object.assign(levels, { 'upper-arm-R': v - 1, 'finger-thumb-R': 3, 'finger-index-R': 3, 'spine-C5': v });
+      }
+      if (r() < 0.3) { regions['scapula-R'] = 'cramp'; kinds['scapula-R'] = ['cramp']; levels['scapula-R'] = v; }
       list.push({
-        ...base(t), type: 'pain', mode: 'checkin', intensity: r() < 0.05 ? null : v, trend: null, regions,
-        qualities: v >= 5 ? ['Aching', 'Burning', 'Tingling'] : ['Aching', 'Stiff'], duration: v >= 5 ? 'Hours' : 'Minutes',
+        ...base(t), type: 'pain', mode: 'checkin', intensity: r() < 0.05 ? null : v, trend: null, regions, kinds, levels,
+        qualities: [], duration: v >= 5 ? 'Hours' : 'Minutes',
         impacts: { sleep: h === 9 ? (poorSleep ? 2 : 0) : null, concentration: v >= 5 ? 1 : 0, work: v >= 6 ? 2 : 0, movement: 1, daily: v >= 6 ? 1 : 0 },
-        symptoms: v >= 6 ? ['Headache'] : [], postures: h === 14 && longDown ? ['down'] : [], activities: h === 14 ? ['Computer'] : [], slot,
+        symptoms: v >= 6 ? ['Headache'] : poorSleep && h === 9 ? ['Migraine'] : [], postures: h === 14 && longDown ? ['down'] : [], activities: h === 14 ? ['Computer'] : [], slot,
         note: v >= 7 ? 'Pain shot down to my thumb after reading on the phone' : '',
       });
       if (v >= 5 && h === 14) {
@@ -111,8 +117,11 @@ await panelTap(0, 115, 85, 200); // right upper neck
 await panelTap(0, 100, 115, 200); // spine C5
 await panelTap(0, 168, 200, 200); // right shoulder blade
 await panelTap(1, 60, 100, 120);  // right upper arm
-await panelTap(1, 70, 250, 120);  // right hand, thumb side
-await page.locator('.srow').last().locator('.sens-opt:has-text("Tingling")').click();
+await panelTap(1, 75, 262, 120);  // right index finger
+await page.locator('.srow').last().locator('.kind:has-text("Tingling")').click();
+await page.locator('.srow').nth(1).locator('.kind:has-text("Ache")').click();
+await page.locator('.srow').nth(1).locator('.kind:has-text("Stiffness")').click();
+await page.click('.chip:has-text("Headache")');
 await page.waitForTimeout(2000);
 await shot('06-checkin-filled', false);
 await page.evaluate(() => window.scrollTo(0, 700));
@@ -127,8 +136,8 @@ await page.click('.sheet .chip:has-text("10 min")');
 await shot('07b-exercise', false);
 await page.click('.sheet .chip:has-text("10 s")');
 await page.click('.sheet-head .bar-btn.strong');
-await page.click('.row-item:has-text("Feels like")');
-await page.click('.chip:has-text("Burning")');
+await page.click('.row-item:has-text("How long it lasts")');
+await page.click('.chip:has-text("Hours")');
 await page.evaluate(() => window.scrollTo(0, 99999));
 await shot('08-checkin-details', false);
 await page.click('.savebar .btn');

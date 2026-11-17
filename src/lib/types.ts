@@ -1,4 +1,5 @@
-export type Sensation = 'pain' | 'tingling' | 'numb';
+/** What an area feels like. 'pain' and 'numb' come from older entries. */
+export type Sensation = 'ache' | 'nerve' | 'tingling' | 'cramp' | 'stiff' | 'pain' | 'numb';
 export type Level = 0 | 1 | 2; // none / some / a lot
 export type Helped = 'notyet' | 'no' | 'little' | 'lot' | 'unsure';
 
@@ -19,6 +20,7 @@ export interface PainEntry extends Base {
   trend?: 'better' | 'worse' | 'same' | 'new' | null;
   regions: Record<string, Sensation>;
   levels?: Record<string, number>; // 0-10 per marked area
+  kinds?: Record<string, Sensation[]>; // every type chosen per area (regions holds the first)
   qualities: string[];
   duration?: string | null;
   impacts: Record<string, Level | null>;

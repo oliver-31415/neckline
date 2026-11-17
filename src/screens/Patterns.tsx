@@ -2,7 +2,7 @@ import { useState } from 'preact/hooks';
 import { entries } from '../lib/store';
 import { DAY, startOfDay } from '../lib/time';
 import {
-  WINDOWS, buildFactors, compare, countBy, daily, describe, fmt1, impactFrequency, inRange, regionFrequency, summary, treatmentStats,
+  WINDOWS, buildFactors, entryKindLabels, compare, countBy, daily, describe, fmt1, impactFrequency, inRange, regionFrequency, summary, treatmentStats,
   VERDICT_LABEL, type Comparison, type WindowId,
 } from '../lib/analysis';
 import { HELPED_LABELS, IMPACTS } from '../lib/catalog';
@@ -56,7 +56,7 @@ export function Patterns() {
     .map((f) => compare(f, sum.readings, win))
     .sort((a, b) => order[a.verdict] - order[b.verdict] || Math.abs(b.diff || 0) - Math.abs(a.diff || 0));
   const treatments = treatmentStats(all, from, to);
-  const qualities = countBy(pains.map((p) => p.qualities));
+  const qualities = countBy(pains.map(entryKindLabels));
   const symptoms = countBy(pains.map((p) => p.symptoms));
   const impacts = impactFrequency(pains);
   const groups = ['All', ...new Set(factors.map((f) => f.group))];
@@ -65,7 +65,7 @@ export function Patterns() {
     return (
       <div class="screen">
         <Nav title="Insights" />
-        <div class="empty"><IconPatterns /><div>Once you’ve logged for a few days, this page shows how your pain changes and what tends to happen alongside it.</div></div>
+        <div class="empty"><IconPatterns /><div>No entries</div></div>
       </div>
     );
   }
@@ -74,11 +74,6 @@ export function Patterns() {
     <div class="screen">
       <Nav title="Insights" />
       <Seg required options={RANGES} value={days} onChange={(v) => setDays(v ?? days)} />
-
-      <div class="notice">
-        <IconInfo />
-        <div>These patterns show what <b>occurred alongside</b> your pain, not what caused it. Treat them as questions for your clinician.</div>
-      </div>
 
       <div class="stat-tiles">
         <div class="stat"><div class="label">Average</div><div class="value">{fmt1(sum.mean)}<small>/10</small></div></div>
@@ -104,12 +99,11 @@ export function Patterns() {
             <BodyMap heat={heat} />
             <HBars max={100} color="var(--pain)" rows={regions.counts.slice(0, 6).map(([r, n]) => ({ label: regionLabel(r), value: (n / regions.total) * 100, text: `${Math.round((n / regions.total) * 100)}%` }))} />
           </>
-        ) : <p class="small muted">Mark areas on the body map during check-ins to see this.</p>}
+        ) : <p class="small muted">–</p>}
       </section>
 
       <section class="card">
         <div class="card-head"><h2>Possible associations</h2></div>
-        <p class="small muted" style={{ marginBottom: 12 }}>Compares pain readings near each factor with your other readings. Effects can be delayed, so try different time windows.</p>
         <div class="when-row" style={{ marginBottom: 10 }}>
           {WINDOWS.map((w) => <button key={w.id} class={'chip' + (win === w.id ? ' on' : '')} onClick={() => setWin(w.id)}>{w.label}</button>)}
         </div>
@@ -118,7 +112,6 @@ export function Patterns() {
             {groups.map((g) => <button key={g} class={'chip' + (group === g ? ' on' : '')} style={{ minHeight: 32, padding: '4px 12px', fontSize: 14 }} onClick={() => setGroup(g)}>{g}</button>)}
           </div>
         )}
-        {comps.length === 0 && <p class="small muted">Log posture, activities, food, treatments or sleep to compare them with your pain.</p>}
         {(showAll ? comps : comps.slice(0, 6)).map((c) => <Assoc key={c.factor.id} c={c} win={win} />)}
         {comps.length > 6 && <button class="btn wide sm" style={{ marginTop: 10 }} onClick={() => setShowAll(!showAll)}>{showAll ? 'Show fewer' : `Show all ${comps.length}`}</button>}
       </section>
@@ -132,7 +125,7 @@ export function Patterns() {
                 <div class="row between"><b>{t.name}</b><span class="small muted">{t.count}× {t.doses.length ? '· ' + t.doses.join(', ') : ''}</span></div>
                 {t.pairs > 0 ? (
                   <div class="small">Pain {fmt1(t.before)} before → <b>{fmt1(t.after)}</b> within 0.5–4 h after <span class="muted">({t.pairs} time{t.pairs === 1 ? '' : 's'} with readings on both sides)</span></div>
-                ) : <div class="small muted">Log pain before and a few hours after to compare.</div>}
+                ) : null}
                 {Object.keys(t.helped).length > 0 && (
                   <div class="chips">
                     {Object.entries(t.helped).map(([h, n]) => <span key={h} class="badge">{HELPED_LABELS[h]} · {n}</span>)}
@@ -169,10 +162,6 @@ export function Patterns() {
         </section>
       )}
 
-      <section class="card flat row" style={{ alignItems: 'flex-start' }}>
-        <span style={{ width: 22, height: 22, color: 'var(--muted)', flex: 'none' }}><IconSpark /></span>
-        <div class="small muted"><b>AI overview: coming later.</b> An optional summary written by an AI could go here. It would stay off unless you turn it on and choose exactly what gets shared.</div>
-      </section>
     </div>
   );
 }
@@ -200,10 +189,9 @@ function Assoc({ c, win }: { c: Comparison; win: WindowId }) {
           </div>
         </div>
       )}
-      <div class="small muted">{c.exposed.length} vs {c.other.length} readings · logged {c.occurrences}×{open ? '' : ' · tap for details'}</div>
+      <div class="small muted">{c.exposed.length} vs {c.other.length} readings · logged {c.occurrences}×</div>
       {open && <p class="small">{describe(c, win)}</p>}
       {open && c.factor.caution && <p class="small muted">{c.factor.caution}</p>}
-      {open && <p class="small muted">Other things happening at the same time could explain any difference.</p>}
     </div>
   );
 }

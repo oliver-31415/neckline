@@ -44,7 +44,7 @@ export function TimelineDays() {
         <span><i style={{ background: 'var(--surface)', border: '2px solid var(--pain)', borderRadius: '50%' }} />Pain change</span>
       </div>
       {items.length ? items : (
-        <div class="empty"><IconTimeline /><div>Your entries will appear here, lined up across each day so you can see what happened around pain changes.</div></div>
+        <div class="empty"><IconTimeline /><div>No entries</div></div>
       )}
       {all.length > 0 && cur.getTime() >= earliest && (
         <button class="btn wide" onClick={() => setDays(days + 14)}>Show earlier days</button>

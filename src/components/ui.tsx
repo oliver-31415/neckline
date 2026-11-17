@@ -119,7 +119,7 @@ export function Chips({ options, value, onChange, single, onAdd, labels, tint }:
       ))}
       {onAdd && (adding ? (
         <input
-          class="input chip-input" autoFocus value={text} placeholder="Type & press return"
+          class="input chip-input" autoFocus value={text} 
           onInput={(e) => setText((e.target as HTMLInputElement).value)}
           onKeyDown={(e) => e.key === 'Enter' && commit()} onBlur={commit}
         />
@@ -208,7 +208,7 @@ export function SliderRow({ label, value, onChange, accessory, children, compact
       <div class="srow-top">
         <span class="srow-label">{label}</span>
         <span class="srow-value">
-          {value === undefined ? <span class="muted">Slide to rate</span> : value === null ? <span class="muted">Not sure</span> : <>{!compact && <span>{painWord(value)}</span>}<PainPill n={value} /></>}
+          {value === undefined ? null : value === null ? <span class="muted">Not sure</span> : <>{!compact && <span>{painWord(value)}</span>}<PainPill n={value} /></>}
         </span>
         {accessory}
       </div>

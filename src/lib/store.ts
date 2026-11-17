@@ -16,7 +16,10 @@ export function uid() {
 export async function init() {
   const [list, s] = await Promise.all([db.loadEntries(), db.loadSettings()]);
   entries.value = list;
-  settings.value = { ...DEFAULT_SETTINGS, ...(s ?? {}), steps: { ...DEFAULT_SETTINGS.steps, ...(s?.steps ?? {}) } };
+  const merged = { ...DEFAULT_SETTINGS, ...(s ?? {}), steps: { ...DEFAULT_SETTINGS.steps, ...(s?.steps ?? {}) } };
+  // Headache and migraine are always offered as symptoms.
+  merged.symptoms = ['Headache', 'Migraine', ...merged.symptoms.filter((x) => x !== 'Headache' && x !== 'Migraine')];
+  settings.value = merged;
   ready.value = true;
   // Ask iOS/Safari not to evict this data under storage pressure.
   navigator.storage?.persist?.().catch(() => {});

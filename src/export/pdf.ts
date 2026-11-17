@@ -2,7 +2,7 @@ import { jsPDF } from 'jspdf';
 import { autoTable } from 'jspdf-autotable';
 import type { Entry, PainEntry, Settings } from '../lib/types';
 import {
-  buildFactors, compare, countBy, daily, dayEntries, fmt1, impactFrequency, inRange, mean, regionFrequency, summary, treatmentStats,
+  buildFactors, compare, countBy, entryKindLabels, daily, dayEntries, fmt1, impactFrequency, inRange, mean, regionFrequency, summary, treatmentStats,
   VERDICT_LABEL, type WindowId,
 } from '../lib/analysis';
 import { DURATIONS, HELPED_LABELS, IMPACTS } from '../lib/catalog';
@@ -142,28 +142,23 @@ export async function buildReport(all: Entry[], s: Settings, o: ReportOptions): 
   const regions = regionFrequency(pains);
   if (regions.total) {
     h2('Where symptoms were felt', `${regions.total} entries with a body map`);
-    ensure(70);
     const heat = Object.fromEntries(regions.counts.map(([r, n]) => [r, n / regions.total]));
-    const png = await svgToPng(diagramSvg(heat));
-    const top = y;
-    if (png) doc.addImage(png, 'PNG', M, y, 74, 65.3);
-    y = top;
-    autoTable(doc, {
-      startY: top, margin: { left: M + 80, right: M },
-      head: [['Area', 'How often', 'Described as']],
-      body: regions.counts.slice(0, 12).map(([r, n]) => [
-        regionLabel(r), `${Math.round((n / regions.total) * 100)}%`,
+    const png = await svgToPng(diagramSvg(heat), 1360, 600);
+    const ih = CW * (600 / 1360);
+    ensure(ih + 4);
+    if (png) { doc.addImage(png, 'PNG', M, y, CW, ih); y += ih + 4; }
+    table(['Area', 'How often', 'Average level', 'Described as'], regions.counts.slice(0, 14).map(([r, n]) => {
+      const lv = pains.flatMap((p) => (p.levels?.[r] != null ? [p.levels[r]] : []));
+      return [
+        regionLabel(r), `${Math.round((n / regions.total) * 100)}%`, lv.length ? fmt1(mean(lv)) : '–',
         Object.entries(regions.sensations[r] ?? {}).sort((a, b) => b[1] - a[1]).map(([k]) => SENSATION_LABEL[k as keyof typeof SENSATION_LABEL]).join(', '),
-      ]),
-      styles: { font: 'helvetica', fontSize: 8, cellPadding: 1.5, textColor: INK, lineColor: LINE, lineWidth: 0.2 },
-      headStyles: { fillColor: [244, 241, 236], textColor: INK2 }, theme: 'grid',
-    });
-    y = Math.max(top + 68, ((doc as any).lastAutoTable?.finalY ?? top) + 6);
+      ];
+    }), [62, 24, 26, CW - 112]);
   }
 
   /* ---------- character ---------- */
   const n = pains.length || 1;
-  const q = countBy(pains.map((p) => p.qualities));
+  const q = countBy(pains.map(entryKindLabels));
   const sy = countBy(pains.map((p) => p.symptoms));
   const du = countBy(pains.map((p) => (p.duration ? [p.duration] : [])));
   const im = impactFrequency(pains);

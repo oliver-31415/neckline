@@ -39,10 +39,10 @@ export function QuickPosture({ onAdd, onClose }: { onAdd: (e: Extra) => void; on
       <Block title="Position you were in">
         <PostureTiles single options={settings.value.postures} value={posture ? [posture] : []} onChange={(v) => setPosture(v[0] ?? '')} />
       </Block>
-      <Block title="Held for" aside="optional">
+      <Block title="Held for">
         <Pick options={HELD} value={minutes} onChange={setMinutes} />
       </Block>
-      <Block title="Breaks" aside="optional">
+      <Block title="Breaks">
         <Seg options={[{ v: 'yes', label: 'Yes' }, { v: 'some', label: 'A few' }, { v: 'no', label: 'No' }]} value={breaks} onChange={setBreaks} />
       </Block>
     </Sheet>
@@ -75,10 +75,10 @@ export function QuickMed({ onAdd, onClose }: { onAdd: (e: Extra) => void; onClos
         </Block>
       )}
       <Block title={saved.length ? 'Or type it' : 'Medication'}>
-        <input class="input" placeholder="Name, e.g. Ibuprofen" value={name} autocomplete="off" onInput={(e) => setName((e.target as HTMLInputElement).value)} />
-        <input class="input" placeholder="Dose, e.g. 400 mg (optional)" value={dose} autocomplete="off" onInput={(e) => setDose((e.target as HTMLInputElement).value)} />
+        <input class="input" placeholder="Name" value={name} autocomplete="off" onInput={(e) => setName((e.target as HTMLInputElement).value)} />
+        <input class="input" placeholder="Dose" value={dose} autocomplete="off" onInput={(e) => setDose((e.target as HTMLInputElement).value)} />
       </Block>
-      <Block title="Taken" aside="optional">
+      <Block title="Taken">
         <Pick options={TAKEN} value={ago} onChange={setAgo} />
       </Block>
     </Sheet>
@@ -106,10 +106,10 @@ export function QuickExercise({ onAdd, onClose }: { onAdd: (e: Extra) => void; o
       <Block title="Exercise">
         <Chips single options={settings.value.exercises} value={name ? [name] : []} onChange={(v) => setName(v[0] ?? '')} onAdd={(v) => rememberChip('exercises', v)} />
       </Block>
-      <Block title="Done for" aside="optional">
+      <Block title="Done for">
         <Pick options={DONE_FOR} value={minutes} onChange={setMinutes} />
       </Block>
-      <Block title="Each hold" aside="optional">
+      <Block title="Each hold">
         <Pick options={HOLDS} value={hold} onChange={setHold} />
       </Block>
     </Sheet>

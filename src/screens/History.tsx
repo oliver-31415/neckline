@@ -43,7 +43,7 @@ export function History() {
       ))}
 
       {list.length === 0 ? (
-        <div class="empty"><IconTimeline /><div>Nothing here yet. Your check-ins and other entries will show up here.</div></div>
+        <div class="empty"><IconTimeline /><div>No entries</div></div>
       ) : view === 'days' ? (
         <TimelineDays />
       ) : (

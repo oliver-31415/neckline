@@ -14,9 +14,13 @@ It doesn't diagnose anything.
   underneath. A "Pain changed" switch logs changes as they happen. History,
   Insights and Report each have their own tab. "Not sure" is always an option,
   and skipped check-ins are simply skipped.
-- **Body map.** Front and back views with your incision site. Each marked area
-  gets its own 0–10 level and can be set to pain, tingling or numbness: neck,
-  base of skull, shoulders, shoulder blades, arms and three zones of each hand.
+- **Body diagram.** Back and front views of the neck and upper back (spine
+  C1–T7, shoulder blades) and the right arm down to individual fingers. Each
+  marked area has its own 0–10 level and one or more types: ache, sharp nerve
+  pain, tingling, cramping, stiffness. Headache, migraine and other symptoms
+  are logged separately.
+- **Since your last check-in.** Optional posture (held for how long),
+  medication (dose, when) and exercise (how long, hold time) entries.
 - **Careful patterns.** A 24-hour timeline for each day with lanes for pain and
   context. Comparisons across time windows (same time, 0–3 h, 0–6 h, 0–24 h,
   next day) always show how many entries back them up, and they're worded as

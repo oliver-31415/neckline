@@ -2,6 +2,7 @@ import type { Entry } from '../lib/types';
 import { POSTURES, HELPED_LABELS, IMPACTS } from '../lib/catalog';
 import { regionLabel, SENSATION_LABEL } from '../components/BodyMap';
 import { stamp } from './files';
+import { areaKinds, entryKindLabels } from '../lib/analysis';
 
 const IMPACT_LEVEL = ['none', 'some', 'a lot'];
 
@@ -24,8 +25,11 @@ export function entriesCsv(list: Entry[]): File {
       case 'pain':
         r['Pain (0-10)'] = e.intensity ?? 'not sure';
         r['Pain change'] = e.trend ?? '';
-        r['Where'] = Object.entries(e.regions).map(([k, s]) => `${regionLabel(k)} (${SENSATION_LABEL[s]})`).join('; ');
-        r['Feels like'] = e.qualities.join('; ');
+        r['Where'] = Object.keys(e.regions).map((k) => {
+          const bits = [areaKinds(e, k).map((x) => SENSATION_LABEL[x]).join('/'), e.levels?.[k] != null ? String(e.levels[k]) : ''].filter(Boolean).join(' ');
+          return `${regionLabel(k)}${bits ? ` (${bits})` : ''}`;
+        }).join('; ');
+        r['Feels like'] = entryKindLabels(e).join('; ');
         r['Lasts'] = e.duration ?? '';
         for (const i of IMPACTS) r[`Affects ${i.label.toLowerCase()}`] = e.impacts[i.id] != null ? IMPACT_LEVEL[e.impacts[i.id]!] : '';
         r['Other symptoms'] = e.symptoms.join('; ');

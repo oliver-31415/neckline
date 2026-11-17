@@ -190,7 +190,7 @@ export function DayStrip({ day, list }: { day: number; list: Entry[] }) {
       </svg>
       {tip && (
         <div class="chart-tip" style={{ left: Math.min(Math.max(tip.x, 90), W - 90), top: tip.y, pointerEvents: 'auto' }}>
-          {tip.text} <span style={{ opacity: 0.6 }}>· tap again to edit</span>
+          {tip.text}
         </div>
       )}
     </div>

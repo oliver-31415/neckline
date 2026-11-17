@@ -5,6 +5,7 @@ import { fmtMinutes, fmtTime } from '../lib/time';
 import { editEntry } from '../lib/nav';
 import { getPhoto } from '../lib/db';
 import { regionLabel } from './BodyMap';
+import { entryKindLabels } from '../lib/analysis';
 import { PainPill } from './ui';
 import { IconActivity, IconMeal, IconMoon, IconPill, IconPosture } from './Icons';
 
@@ -22,7 +23,9 @@ export function entrySummary(e: Entry): { title: string; detail: string } {
       const parts: string[] = [];
       const regions = Object.keys(e.regions);
       if (regions.length) parts.push(regions.length <= 2 ? regions.map(regionLabel).join(', ') : `${regionLabel(regions[0])} +${regions.length - 1} more`);
-      if (e.qualities.length) parts.push(e.qualities.join(', ').toLowerCase());
+      const kinds = entryKindLabels(e);
+      if (kinds.length) parts.push(kinds.join(', ').toLowerCase());
+      if (e.symptoms.length) parts.push(e.symptoms.join(', ').toLowerCase());
       if (e.postures.length) parts.push(e.postures.map((p) => POSTURES[p]?.label ?? p).join(', ').toLowerCase());
       if (e.activities.length) parts.push(e.activities.join(', ').toLowerCase());
       if (e.note) parts.push(`“${e.note}”`);
@@ -36,7 +39,7 @@ export function entrySummary(e: Entry): { title: string; detail: string } {
     case 'meal':
       return { title: e.tags.length ? e.tags.join(', ') : 'Food & drink', detail: e.note ?? '' };
     case 'treatment':
-      return { title: `${e.name}${e.dose ? ' · ' + e.dose : ''}`, detail: [e.helped ? HELPED_LABELS[e.helped] : 'Did it help? Tap to add', e.sideEffects.length ? 'side effects: ' + e.sideEffects.join(', ').toLowerCase() : ''].filter(Boolean).join(' · ') };
+      return { title: `${e.name}${e.dose ? ' · ' + e.dose : ''}`, detail: [e.helped ? HELPED_LABELS[e.helped] : '', e.sideEffects.length ? 'side effects: ' + e.sideEffects.join(', ').toLowerCase() : ''].filter(Boolean).join(' · ') };
     case 'day':
       return {
         title: 'Sleep & day',
