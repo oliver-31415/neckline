@@ -9,7 +9,7 @@ import { HELPED_LABELS, IMPACTS } from '../lib/catalog';
 import type { PainEntry } from '../lib/types';
 import { PainTrend, TrendLegend } from '../components/Charts';
 import { BodyMap, regionLabel } from '../components/BodyMap';
-import { Seg } from '../components/ui';
+import { Nav, Seg } from '../components/ui';
 import { IconInfo, IconPatterns, IconSpark } from '../components/Icons';
 import { settings } from '../lib/store';
 
@@ -65,7 +65,7 @@ export function Patterns() {
   if (all.length === 0) {
     return (
       <div class="screen">
-        <header class="screen-head"><div><div class="eyebrow">Insights</div><h1>Patterns</h1></div></header>
+        <Nav title="Insights" />
         <div class="empty"><IconPatterns /><div>Once you’ve logged for a few days, this page shows how your pain changes and what tends to happen alongside it.</div></div>
       </div>
     );
@@ -73,8 +73,8 @@ export function Patterns() {
 
   return (
     <div class="screen">
-      <header class="screen-head"><div><div class="eyebrow">Insights</div><h1>Patterns</h1></div></header>
-      <Seg options={RANGES} value={days} onChange={(v) => setDays(v ?? days)} />
+      <Nav title="Insights" />
+      <Seg required options={RANGES} value={days} onChange={(v) => setDays(v ?? days)} />
 
       <div class="notice">
         <IconInfo />
@@ -102,7 +102,7 @@ export function Patterns() {
         <div class="card-head"><h2>Where it shows up</h2><span class="small muted">{regions.total} mapped entries</span></div>
         {regions.total ? (
           <>
-            <BodyMap heat={heat} incision={settings.value.incision} compact />
+            <BodyMap heat={heat} incision={settings.value.incision} maxWidth={220} />
             <HBars max={100} color="var(--pain)" rows={regions.counts.slice(0, 6).map(([r, n]) => ({ label: regionLabel(r), value: (n / regions.total) * 100, text: `${Math.round((n / regions.total) * 100)}%` }))} />
           </>
         ) : <p class="small muted">Mark areas on the body map during check-ins to see this.</p>}

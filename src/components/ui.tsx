@@ -1,15 +1,15 @@
 import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { signal } from '@preact/signals';
-import { IconClose, IconPlus } from './Icons';
+import { IconChevron, IconPlus } from './Icons';
 import { painWord } from '../lib/catalog';
 import { fromLocalInput, toLocalInput, HOUR } from '../lib/time';
 import { sheet } from '../lib/nav';
 
 /* ---------- pain colour ramp (single warm hue, light → dark) ---------- */
-const RAMP = ['#efe9e1', '#fde3d2', '#fbcdb0', '#f8b58c', '#f49c6a', '#ee844c', '#e66c35', '#d65426', '#bf401d', '#a12f16', '#7f2211'];
+const RAMP = ['#e9e4dc', '#fde3d2', '#fbcdb0', '#f8b58c', '#f49c6a', '#ee844c', '#e66c35', '#d65426', '#bf401d', '#a12f16', '#7f2211'];
 export function painBg(n: number | null) {
-  return n === null ? 'var(--surface-3)' : RAMP[Math.max(0, Math.min(10, Math.round(n)))];
+  return n === null ? 'var(--fill)' : RAMP[Math.max(0, Math.min(10, Math.round(n)))];
 }
 export function painInk(n: number | null) {
   return n !== null && n >= 6 ? '#ffffff' : '#2a1a12';
@@ -18,8 +18,25 @@ export function PainPill({ n }: { n: number | null }) {
   return <span class="pain-pill" style={{ background: painBg(n), color: n === null ? 'var(--ink-2)' : painInk(n) }}>{n ?? '?'}</span>;
 }
 
-/* ---------- sheet ---------- */
-export function Sheet({ title, onClose, children, footer, tall }: { title: string; onClose: () => void; children: ComponentChildren; footer?: ComponentChildren; tall?: boolean }) {
+/* ---------- navigation bar with large title ---------- */
+export function Nav({ title, sub, children }: { title: string; sub?: ComponentChildren; children?: ComponentChildren }) {
+  return (
+    <header class="nav">
+      <div class="nav-actions">{children}</div>
+      <h1>{title}</h1>
+      {sub && <div class="nav-sub">{sub}</div>}
+    </header>
+  );
+}
+
+/* ---------- sheet (iOS page sheet: Cancel · Title · Action) ---------- */
+export function Sheet({ title, onClose, children, action, tall }: {
+  title: string;
+  onClose: () => void;
+  children: ComponentChildren;
+  action?: { label: string; onClick: () => void; disabled?: boolean };
+  tall?: boolean;
+}) {
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -33,24 +50,37 @@ export function Sheet({ title, onClose, children, footer, tall }: { title: strin
       <div class={'sheet' + (tall ? ' tall' : '')} role="dialog" aria-modal="true" aria-label={title}>
         <div class="sheet-grab" />
         <div class="sheet-head">
+          <button class="bar-btn" onClick={onClose}>{action ? 'Cancel' : ''}</button>
           <h2>{title}</h2>
-          <button class="icon-btn" style={{ boxShadow: 'none', background: 'var(--surface-3)', width: 34, height: 34 }} onClick={onClose} aria-label="Close">
-            <IconClose />
-          </button>
+          {action
+            ? <button class="bar-btn strong" disabled={action.disabled} onClick={action.onClick}>{action.label}</button>
+            : <button class="bar-btn strong" onClick={onClose}>Done</button>}
         </div>
         <div class="sheet-body">{children}</div>
-        {footer && <div class="sheet-foot">{footer}</div>}
       </div>
     </>
   );
 }
 
-export function Block({ title, aside, children }: { title: string; aside?: ComponentChildren; children: ComponentChildren }) {
+/* ---------- grouped sections ---------- */
+export function Block({ title, aside, children, foot, flush }: { title?: string; aside?: ComponentChildren; children: ComponentChildren; foot?: ComponentChildren; flush?: boolean }) {
   return (
-    <section class="block">
-      <div class="block-title"><h3>{title}</h3>{aside && <span class="muted">{aside}</span>}</div>
-      {children}
+    <section class="section">
+      {(title || aside) && <div class="sec-head"><span>{title}</span>{aside && <span class="sec-aside">{aside}</span>}</div>}
+      <div class={'group' + (flush ? ' flush' : ' pad')}>{children}</div>
+      {foot && <div class="sec-foot">{foot}</div>}
     </section>
+  );
+}
+
+export function Row({ label, value, onClick, icon, danger }: { label: ComponentChildren; value?: ComponentChildren; onClick?: () => void; icon?: ComponentChildren; danger?: boolean }) {
+  return (
+    <button class={'row-item' + (danger ? ' danger' : '')} onClick={onClick} disabled={!onClick}>
+      {icon && <span class="row-icon">{icon}</span>}
+      <span class="row-label">{label}</span>
+      {value != null && <span class="row-value">{value}</span>}
+      {onClick && !danger && <span class="row-chev"><IconChevron /></span>}
+    </button>
   );
 }
 
@@ -89,8 +119,7 @@ export function Chips({ options, value, onChange, single, onAdd, labels, tint }:
       ))}
       {onAdd && (adding ? (
         <input
-          class="input" style={{ width: 160, minHeight: 40, padding: '7px 12px', borderRadius: 999 }}
-          autoFocus value={text} placeholder="Type & press return"
+          class="input chip-input" autoFocus value={text} placeholder="Type & press return"
           onInput={(e) => setText((e.target as HTMLInputElement).value)}
           onKeyDown={(e) => e.key === 'Enter' && commit()} onBlur={commit}
         />
@@ -101,11 +130,11 @@ export function Chips({ options, value, onChange, single, onAdd, labels, tint }:
   );
 }
 
-export function Seg<T extends string | number | boolean | null>({ options, value, onChange }: { options: { v: T; label: string }[]; value: T; onChange: (v: T) => void }) {
+export function Seg<T extends string | number | boolean | null>({ options, value, onChange, required }: { options: { v: T; label: string }[]; value: T; onChange: (v: T) => void; required?: boolean }) {
   return (
     <div class="seg">
       {options.map((o) => (
-        <button key={String(o.v)} class={value === o.v ? 'on' : ''} onClick={() => onChange(value === o.v ? (null as T) : o.v)}>{o.label}</button>
+        <button key={String(o.v)} class={value === o.v ? 'on' : ''} onClick={() => onChange(value === o.v && !required ? (null as T) : o.v)}>{o.label}</button>
       ))}
     </div>
   );
@@ -120,38 +149,71 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
   );
 }
 
-/* ---------- pain scale ---------- */
-export function PainScale({ value, onChange }: { value: number | null | undefined; onChange: (v: number | null) => void }) {
+/* ---------- pain slider (0–10) ----------
+ * Drag sideways or tap anywhere on the track. A vertical swipe scrolls the page instead,
+ * so starting a scroll on the slider never changes the value. */
+export function PainSlider({ value, onChange, label }: { value: number | null | undefined; onChange: (v: number) => void; label: string }) {
   const track = useRef<HTMLDivElement>(null);
-  const v = value === undefined ? undefined : value;
-  function pick(clientX: number) {
+  const start = useRef<{ x: number; y: number; dragging: boolean } | null>(null);
+  const set = value != null;
+  const f = set ? value! / 10 : 0.5;
+
+  function at(clientX: number) {
     const r = track.current!.getBoundingClientRect();
-    const n = Math.max(0, Math.min(10, Math.floor(((clientX - r.left) / r.width) * 11)));
-    if (n !== value) { onChange(n); navigator.vibrate?.(5); }
+    const v = Math.round(Math.max(0, Math.min(1, (clientX - r.left - 14) / (r.width - 28))) * 10);
+    if (v !== value) { onChange(v); navigator.vibrate?.(4); }
   }
   return (
-    <div class="painscale">
-      <div class="painscale-readout">
-        <div class="painscale-num" style={{ background: v === undefined ? 'var(--surface-3)' : painBg(v), color: v === undefined || v === null ? 'var(--muted)' : painInk(v) }}>
-          {v === undefined ? '–' : v === null ? '?' : v}
-        </div>
-        <div class="grow">
-          <div class="painscale-word">{v === undefined ? 'How strong is it?' : painWord(v)}</div>
-          <div class="small muted">Tap or slide across the scale</div>
-        </div>
-        <button class={'chip' + (v === null ? ' on' : '')} onClick={() => onChange(null)}>Not sure</button>
+    <div
+      ref={track} class={'slider' + (set ? ' set' : '')}
+      role="slider" tabIndex={0} aria-label={label} aria-valuemin={0} aria-valuemax={10} aria-valuenow={value ?? undefined}
+      aria-valuetext={set ? `${value}, ${painWord(value!)}` : 'not rated'}
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowRight' || e.key === 'ArrowUp') onChange(Math.min(10, (value ?? 4) + 1));
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') onChange(Math.max(0, (value ?? 6) - 1));
+      }}
+      onPointerDown={(e) => { start.current = { x: e.clientX, y: e.clientY, dragging: false }; }}
+      onPointerMove={(e) => {
+        const s = start.current;
+        if (!s) return;
+        if (!s.dragging && Math.abs(e.clientX - s.x) > 6 && Math.abs(e.clientX - s.x) > Math.abs(e.clientY - s.y)) s.dragging = true;
+        if (s.dragging) at(e.clientX);
+      }}
+      onPointerUp={(e) => {
+        const s = start.current;
+        if (s && !s.dragging && Math.abs(e.clientX - s.x) < 8 && Math.abs(e.clientY - s.y) < 8) at(e.clientX);
+        start.current = null;
+      }}
+      onPointerCancel={() => { start.current = null; }}
+    >
+      <div class="slider-track">
+        <div class="slider-fill" style={{ clipPath: `inset(0 calc(100% - ${f} * (100% - 28px) - 14px) 0 0)` }} />
       </div>
-      <div
-        class="painscale-track" ref={track}
-        onPointerDown={(e) => { (e.target as Element).releasePointerCapture?.(e.pointerId); pick(e.clientX); }}
-        onPointerMove={(e) => e.buttons && pick(e.clientX)}
-        role="radiogroup" aria-label="Pain from 0 to 10"
-      >
-        {Array.from({ length: 11 }, (_, i) => (
-          <button key={i} class={value === i ? 'on' : ''} role="radio" aria-checked={value === i} aria-label={`${i}, ${painWord(i)}`} onClick={() => onChange(i)} style={{ background: RAMP[i], color: painInk(i) }}>{i}</button>
-        ))}
+      <div class="slider-thumb" style={{ left: `calc(${f} * (100% - 28px))` }} />
+    </div>
+  );
+}
+
+/** Label + value readout + slider; the building block of the check-in screen. */
+export function SliderRow({ label, value, onChange, accessory, children, compact }: {
+  label: ComponentChildren;
+  value: number | null | undefined;
+  onChange: (v: number) => void;
+  accessory?: ComponentChildren;
+  children?: ComponentChildren;
+  compact?: boolean;
+}) {
+  return (
+    <div class={'srow' + (compact ? ' compact' : '')}>
+      <div class="srow-top">
+        <span class="srow-label">{label}</span>
+        <span class="srow-value">
+          {value === undefined ? <span class="muted">Slide to rate</span> : value === null ? <span class="muted">Not sure</span> : <>{!compact && <span>{painWord(value)}</span>}<PainPill n={value} /></>}
+        </span>
+        {accessory}
       </div>
-      <div class="painscale-ends"><span>No pain</span><span>Moderate</span><span>Worst imaginable</span></div>
+      <PainSlider value={value} onChange={onChange} label={typeof label === 'string' ? label : 'Pain'} />
+      {children}
     </div>
   );
 }
@@ -173,7 +235,6 @@ export function WhenPicker({ value, onChange }: { value: number; onChange: (t: n
       ))}
       <input
         type="datetime-local" class={'dt-input' + (isPreset ? '' : ' on')} aria-label="Exact time"
-        style={!isPreset ? { borderColor: 'var(--accent)', boxShadow: '0 0 0 1px var(--accent)' } : undefined}
         value={toLocalInput(value)} max={toLocalInput(Date.now() + 60_000)}
         onChange={(e) => { const v = (e.target as HTMLInputElement).value; if (v) onChange(fromLocalInput(v)); }}
       />

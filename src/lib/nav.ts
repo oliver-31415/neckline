@@ -1,15 +1,18 @@
 import { signal } from '@preact/signals';
 import type { Entry } from './types';
 
-export type SheetKind = 'checkin' | 'change' | 'posture' | 'activity' | 'meal' | 'treatment' | 'day' | 'add';
-export type Tab = 'today' | 'timeline' | 'patterns' | 'report' | 'settings';
+export type SheetKind = 'pain' | 'posture' | 'activity' | 'meal' | 'treatment' | 'day' | 'add';
+export type Tab = 'checkin' | 'history' | 'insights' | 'report' | 'settings';
+const TABS: Tab[] = ['checkin', 'history', 'insights', 'report', 'settings'];
 
-export const sheet = signal<{ kind: SheetKind; entry?: Entry; slot?: string | null } | null>(null);
+export const sheet = signal<{ kind: SheetKind; entry?: Entry } | null>(null);
 export const tab = signal<Tab>(readTab());
+/** Scheduled slot a reminder notification asked about, e.g. "09:00". */
+export const pendingSlot = signal<string | null>(null);
 
-function readTab(): Tab {
+export function readTab(): Tab {
   const h = location.hash.replace(/^#\/?/, '').split('?')[0];
-  return (['today', 'timeline', 'patterns', 'report', 'settings'] as Tab[]).includes(h as Tab) ? (h as Tab) : 'today';
+  return TABS.includes(h as Tab) ? (h as Tab) : 'checkin';
 }
 
 export function go(t: Tab) {
@@ -18,8 +21,8 @@ export function go(t: Tab) {
   window.scrollTo({ top: 0 });
 }
 
-export function openSheet(kind: SheetKind, extra: { entry?: Entry; slot?: string | null } = {}) {
-  sheet.value = { kind, ...extra };
+export function openSheet(kind: SheetKind, entry?: Entry) {
+  sheet.value = { kind, entry };
 }
 
 export function closeSheet() {
@@ -28,6 +31,5 @@ export function closeSheet() {
 
 /** Opens the editor that matches an existing entry. */
 export function editEntry(e: Entry) {
-  const kind: SheetKind = e.type === 'pain' ? (e.mode === 'change' ? 'change' : 'checkin') : e.type;
-  openSheet(kind, { entry: e });
+  openSheet(e.type, e);
 }

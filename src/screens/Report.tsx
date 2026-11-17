@@ -2,7 +2,7 @@ import { useState } from 'preact/hooks';
 import { entries, settings, uid, updateSettings } from '../lib/store';
 import { DAY, dayKey, fmtDay, fromDayKey, startOfDay } from '../lib/time';
 import { fmt1, inRange, summary } from '../lib/analysis';
-import { Block, Toggle, showToast } from '../components/ui';
+import { Block, Nav, Toggle, showToast } from '../components/ui';
 import { IconCheck, IconDownload, IconReport, IconShare, IconTrash } from '../components/Icons';
 import { entriesCsv } from '../export/csv';
 import { shareOrDownload } from '../export/files';
@@ -46,30 +46,7 @@ export function Report() {
 
   return (
     <div class="screen">
-      <header class="screen-head"><div><div class="eyebrow">For your clinician</div><h1>Report</h1></div></header>
-
-      <Block title="Appointments">
-        <div class="row" style={{ gap: 10 }}>
-          <label class="field grow"><span>Last one</span><input type="date" class="input" value={s.lastAppointment} onChange={(e) => updateSettings({ lastAppointment: (e.target as HTMLInputElement).value })} /></label>
-          <label class="field grow"><span>Next one</span><input type="date" class="input" value={s.nextAppointment} onChange={(e) => updateSettings({ nextAppointment: (e.target as HTMLInputElement).value })} /></label>
-        </div>
-      </Block>
-
-      <Block title="Questions to ask" aside={s.questions.filter((q) => !q.done).length ? `${s.questions.filter((q) => !q.done).length} open` : 'included in the PDF'}>
-        {s.questions.map((q) => (
-          <div key={q.id} class="row" style={{ alignItems: 'flex-start' }}>
-            <button class="icon-btn" style={{ width: 28, height: 28, flex: 'none', boxShadow: 'none', border: '1.5px solid var(--line-strong)', background: q.done ? 'var(--accent)' : 'transparent', color: 'var(--accent-ink)' }} aria-label={q.done ? 'Mark as not asked' : 'Mark as asked'} onClick={() => setQ(s.questions.map((x) => x.id === q.id ? { ...x, done: !x.done } : x))}>
-              {q.done && <span style={{ width: 16, height: 16 }}><IconCheck /></span>}
-            </button>
-            <span class="grow" style={{ textDecoration: q.done ? 'line-through' : 'none', color: q.done ? 'var(--muted)' : 'inherit', paddingTop: 3 }}>{q.text}</span>
-            <button class="link" style={{ color: 'var(--muted)', width: 22, height: 22 }} aria-label="Delete question" onClick={() => setQ(s.questions.filter((x) => x.id !== q.id))}><IconTrash /></button>
-          </div>
-        ))}
-        <form class="row" onSubmit={(e) => { e.preventDefault(); if (newQ.trim()) { setQ([...s.questions, { id: uid(), text: newQ.trim(), done: false }]); setNewQ(''); } }}>
-          <input class="input grow" placeholder="e.g. Is tingling in my thumb expected at this stage?" value={newQ} onInput={(e) => setNewQ((e.target as HTMLInputElement).value)} />
-          <button class="btn primary" type="submit" disabled={!newQ.trim()}>Add</button>
-        </form>
-      </Block>
+      <Nav title="Report" sub="A summary to share with your clinician" />
 
       <Block title="Period to include">
         <div class="when-row">
@@ -87,19 +64,6 @@ export function Report() {
         <div class="small muted">
           {fmtDay(from, { day: 'numeric', month: 'short' })} – {fmtDay(to - 1, { day: 'numeric', month: 'short' })}: {count} entries, {sum.readings.length} pain readings, average {fmt1(sum.mean)}/10
         </div>
-      </Block>
-
-      <Block title="Include">
-        {([
-          ['includeAssociations', 'Things that occurred alongside pain', 'With entry counts, worded as co-occurrence'],
-          ['includeNotes', 'Your notes', 'Most recent 20'],
-          ['includeLog', 'Full entry log', 'As an appendix page'],
-        ] as const).map(([k, label, hint]) => (
-          <div class="row between" key={k}>
-            <div><div style={{ fontWeight: 600 }}>{label}</div><div class="small muted">{hint}</div></div>
-            <Toggle checked={opts[k]} label={label} onChange={(v) => { setOpts({ ...opts, [k]: v }); setPdf(null); }} />
-          </div>
-        ))}
       </Block>
 
       <div class="stack">
@@ -122,6 +86,44 @@ export function Report() {
         </button>
         <p class="small muted center">Files are created on your phone. You decide where they go, whether that’s Mail, Files, AirDrop or a printer.</p>
       </div>
+
+      <Block title="Questions to ask" aside={s.questions.filter((q) => !q.done).length ? `${s.questions.filter((q) => !q.done).length} open` : 'included in the PDF'}>
+        {s.questions.map((q) => (
+          <div key={q.id} class="row" style={{ alignItems: 'flex-start' }}>
+            <button class={'check' + (q.done ? ' on' : '')} aria-label={q.done ? 'Mark as not asked' : 'Mark as asked'} onClick={() => setQ(s.questions.map((x) => x.id === q.id ? { ...x, done: !x.done } : x))}>
+              {q.done && <span style={{ width: 16, height: 16 }}><IconCheck /></span>}
+            </button>
+            <span class="grow" style={{ textDecoration: q.done ? 'line-through' : 'none', color: q.done ? 'var(--muted)' : 'inherit', paddingTop: 3 }}>{q.text}</span>
+            <button class="link" style={{ color: 'var(--muted)', width: 22, height: 22 }} aria-label="Delete question" onClick={() => setQ(s.questions.filter((x) => x.id !== q.id))}><IconTrash /></button>
+          </div>
+        ))}
+        <form class="row" onSubmit={(e) => { e.preventDefault(); if (newQ.trim()) { setQ([...s.questions, { id: uid(), text: newQ.trim(), done: false }]); setNewQ(''); } }}>
+          <input class="input grow" placeholder="e.g. Is tingling in my thumb expected at this stage?" value={newQ} onInput={(e) => setNewQ((e.target as HTMLInputElement).value)} />
+          <button class="btn primary" type="submit" disabled={!newQ.trim()}>Add</button>
+        </form>
+      </Block>
+
+      <Block title="Include">
+        {([
+          ['includeAssociations', 'Things that occurred alongside pain', 'With entry counts, worded as co-occurrence'],
+          ['includeNotes', 'Your notes', 'Most recent 20'],
+          ['includeLog', 'Full entry log', 'As an appendix page'],
+        ] as const).map(([k, label, hint]) => (
+          <div class="row between" key={k}>
+            <div><div style={{ fontWeight: 600 }}>{label}</div><div class="small muted">{hint}</div></div>
+            <Toggle checked={opts[k]} label={label} onChange={(v) => { setOpts({ ...opts, [k]: v }); setPdf(null); }} />
+          </div>
+        ))}
+      </Block>
+
+      <Block title="Appointments">
+        <div class="row" style={{ gap: 10 }}>
+          <label class="field grow"><span>Last one</span><input type="date" class="input" value={s.lastAppointment} onChange={(e) => updateSettings({ lastAppointment: (e.target as HTMLInputElement).value })} /></label>
+          <label class="field grow"><span>Next one</span><input type="date" class="input" value={s.nextAppointment} onChange={(e) => updateSettings({ nextAppointment: (e.target as HTMLInputElement).value })} /></label>
+        </div>
+      </Block>
+
+
     </div>
   );
 }

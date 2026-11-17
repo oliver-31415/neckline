@@ -8,12 +8,15 @@ It doesn't diagnose anything.
 - **Local only.** Entries and meal photos live in the phone's IndexedDB. No
   accounts, no analytics and no network calls, apart from the optional
   reminder server, which only knows your check-in times.
-- **Quick logging.** Scheduled check-ins, a one-tap "Pain changed" log, and
-  context logs for posture, activity, food, treatment and sleep. Every field
-  is optional, "Not sure" is always an option, and missed check-ins are simply
-  skipped.
-- **Body map.** Front and back views with your incision site. Mark pain,
-  tingling or numbness in the neck, shoulders, arms and three zones of each hand.
+- **Opens on the check-in.** One overall pain slider, a body diagram you tap,
+  and a slider for each marked area. Everything else (what it feels like,
+  duration, impact, symptoms, what you were doing, a note) sits in optional rows
+  underneath. A "Pain changed" switch logs changes as they happen. History,
+  Insights and Report each have their own tab. "Not sure" is always an option,
+  and skipped check-ins are simply skipped.
+- **Body map.** Front and back views with your incision site. Each marked area
+  gets its own 0–10 level and can be set to pain, tingling or numbness: neck,
+  base of skull, shoulders, shoulder blades, arms and three zones of each hand.
 - **Careful patterns.** A 24-hour timeline for each day with lanes for pain and
   context. Comparisons across time windows (same time, 0–3 h, 0–6 h, 0–24 h,
   next day) always show how many entries back them up, and they're worded as

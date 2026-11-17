@@ -78,34 +78,53 @@ await page.evaluate(async (list) => {
 const shot = async (name, full = true) => { await page.waitForTimeout(350); await page.screenshot({ path: `${out}/${name}.png`, fullPage: full }); console.log('shot', name); };
 const tab = async (name) => { await page.goto(BASE + '#/' + name); await page.reload(); await page.waitForTimeout(500); };
 
-await tab('today'); await shot('01-today');
-await tab('timeline'); await shot('02-timeline');
-await tab('patterns'); await shot('03-patterns');
+await tab('checkin'); await shot('01-checkin');
+await tab('history'); await shot('02-history');
+await page.click('.seg button:has-text("Timeline")'); await shot('02b-timeline');
+await tab('insights'); await shot('03-insights');
 await tab('report'); await shot('04-report');
 await tab('settings'); await shot('05-settings');
 
-await tab('today');
-await page.click('text=Check in');
-await page.click('.painscale-track button:nth-child(6)');
-await page.click('.bodymap-svg path[aria-label^="Right front of neck"]', { position: { x: 14, y: 52 } });
-await page.click('text=Tingling');
-await page.click('.bodymap-svg path[aria-label^="Right hand – thumb"]');
+await tab('checkin');
+const sl = page.locator('.slider').first();
+const box = await sl.boundingBox();
+await page.mouse.click(box.x + 14 + (box.width - 28) * 0.6, box.y + box.height / 2);
+// Tap the diagram at viewBox coordinates, like a finger would.
+const mapTap = async (vx, vy) => {
+  const svg = page.locator('.bodymap-svg').first();
+  await svg.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  const b = await svg.boundingBox();
+  const k = b.width / 300;
+  await page.mouse.click(b.x + (vx - 10) * k, b.y + (vy - 4) * k);
+  await page.waitForTimeout(120);
+};
+await mapTap(149, 132); // right front of neck (below the incision marker)
+await mapTap(115, 148); // right top of shoulder
+await mapTap(57, 398);  // right hand, thumb side
+await page.locator('.srow').last().locator('.sens-opt:has-text("Tingling")').click();
+await page.waitForTimeout(2000);
+await shot('06-checkin-filled', false);
+await page.evaluate(() => window.scrollTo(0, 700));
+await shot('07-checkin-regions', false);
+await page.click('.row-item:has-text("Feels like")');
 await page.click('.chip:has-text("Burning")');
-await shot('06-checkin-top', false);
-await page.evaluate(() => document.querySelector('.sheet-body').scrollTo(0, 1100));
-await shot('07-checkin-mid', false);
-await page.evaluate(() => document.querySelector('.sheet-body').scrollTo(0, 99999));
-await shot('08-checkin-end', false);
-await page.click('.sheet-foot .btn.primary');
-await page.waitForTimeout(300);
+await page.evaluate(() => window.scrollTo(0, 99999));
+await shot('08-checkin-details', false);
+await page.click('.savebar .btn');
+await page.waitForTimeout(400);
 await shot('09-saved', false);
 
-await page.click('.tab-plus');
+await page.click('[aria-label="Log something else"]');
 await shot('10-add-menu', false);
-await page.click('.list-row:has-text("Posture")');
+await page.click('.row-item:has-text("Posture")');
 await page.click('.tile:has-text("Looking down")');
 await shot('11-posture', false);
-await page.click('.sheet-head .icon-btn');
+await page.click('.sheet-head .bar-btn >> nth=0');
+
+await tab('history');
+await page.click('.entry >> nth=0');
+await shot('12-edit', false);
+await page.click('.sheet-head .bar-btn >> nth=0');
 
 await tab('report');
 await page.click('text=Create PDF summary');

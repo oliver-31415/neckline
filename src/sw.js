@@ -50,7 +50,7 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const slot = event.notification.data && event.notification.data.slot;
-  const target = new URL('./#/today?checkin=' + (slot || 'now'), self.registration.scope).href;
+  const target = new URL('./#/checkin' + (slot ? '?slot=' + slot : ''), self.registration.scope).href;
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
       for (const w of wins) {

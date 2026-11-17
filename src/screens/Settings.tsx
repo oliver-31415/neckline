@@ -3,13 +3,13 @@ import { settings, updateSettings, wipe, entries } from '../lib/store';
 import { go } from '../lib/nav';
 import { POSTURES, STEPS } from '../lib/catalog';
 import { fmtSlot } from '../lib/time';
-import { Block, Chips, Seg, Toggle, showToast } from '../components/ui';
+import { Block, Chips, Nav, Seg, Toggle, showToast } from '../components/ui';
 import { BodyMap } from '../components/BodyMap';
 import { IconBack, IconBell, IconDownload, IconLock, IconTrash, IconUpload } from '../components/Icons';
 import { disablePush, enablePush, pushSupported, syncSchedule, testPush } from '../lib/push';
 import { makeBackup, restoreBackup } from '../export/backup';
 import { shareOrDownload } from '../export/files';
-import { isStandalone } from './Today';
+import { isStandalone } from '../lib/env';
 import type { Settings as S } from '../lib/types';
 
 type ListKey = 'qualities' | 'symptoms' | 'activities' | 'mealTags' | 'sideEffects';
@@ -55,10 +55,8 @@ export function Settings() {
 
   return (
     <div class="screen">
-      <header class="screen-head" style={{ alignItems: 'center', justifyContent: 'flex-start' }}>
-        <button class="icon-btn" onClick={() => go('today')} aria-label="Back"><IconBack /></button>
-        <h1>Settings</h1>
-      </header>
+      <button class="back-btn" onClick={() => go('checkin')}><IconBack /> Check In</button>
+      <Nav title="Settings" />
 
       <div class="notice">
         <IconLock />
@@ -71,7 +69,7 @@ export function Settings() {
       </Block>
 
       <Block title="Incision site" aside={s.incision ? 'tap to move' : 'tap the map to place'}>
-        <BodyMap incision={s.incision} onPlaceIncision={(p) => updateSettings({ incision: { ...p, orient: s.incision?.orient ?? (p.view === 'front' ? 'h' : 'v') } })} showBrushes={false} compact />
+        <BodyMap incision={s.incision} onPlaceIncision={(p) => updateSettings({ incision: { ...p, orient: s.incision?.orient ?? (p.view === 'front' ? 'h' : 'v') } })} maxWidth={220} />
         <div class="row">
           <span class="grow small muted">Direction of the scar</span>
           <div style={{ width: 200 }}>

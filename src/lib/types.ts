@@ -18,6 +18,7 @@ export interface PainEntry extends Base {
   intensity: number | null; // null = "not sure"
   trend?: 'better' | 'worse' | 'same' | 'new' | null;
   regions: Record<string, Sensation>;
+  levels?: Record<string, number>; // 0-10 per marked area
   qualities: string[];
   duration?: string | null;
   impacts: Record<string, Level | null>;

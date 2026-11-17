@@ -112,3 +112,4 @@ export const POSTURE_ART: Record<string, () => preact.JSX.Element> = {
     </P>
   ),
 };
+export const IconPulse = () => <I><path d="M3 12h4l2.5-6 4 12 2.5-6H21" /></I>;

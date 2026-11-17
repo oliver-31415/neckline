@@ -9,7 +9,7 @@ import { PainPill } from '../components/ui';
 import { IconTimeline } from '../components/Icons';
 import { openSheet } from '../lib/nav';
 
-export function Timeline() {
+export function TimelineDays() {
   const [days, setDays] = useState(7);
   const all = entries.value;
   const today = startOfDay(Date.now());
@@ -38,8 +38,7 @@ export function Timeline() {
   if (gap && items.length) items.push(<Gap key="gend" n={gap} />);
 
   return (
-    <div class="screen">
-      <header class="screen-head"><div><div class="eyebrow">Day by day</div><h1>Timeline</h1></div></header>
+    <>
       <div class="legend" style={{ padding: '0 4px' }}>
         {LANES.map((l) => <span key={l.id}><i style={{ background: l.color }} />{l.label}</span>)}
         <span><i style={{ background: 'var(--surface)', border: '2px solid var(--pain)', borderRadius: '50%' }} />Pain change</span>
@@ -50,7 +49,7 @@ export function Timeline() {
       {all.length > 0 && cur.getTime() >= earliest && (
         <button class="btn wide" onClick={() => setDays(days + 14)}>Show earlier days</button>
       )}
-    </div>
+    </>
   );
 }
 
@@ -75,7 +74,7 @@ function DayCard({ day, list }: { day: number; list: Entry[] }) {
       </div>
       {dayInfo && (
         <div style={{ padding: '0 16px 6px' }}>
-          <button class="badge" style={{ border: 0 }} onClick={() => openSheet('day', { entry: dayInfo })}>
+          <button class="badge" style={{ border: 0 }} onClick={() => openSheet('day', dayInfo)}>
             {[dayInfo.sleepHours != null ? `${dayInfo.sleepHours}h sleep` : '', dayInfo.sleepQuality ? `${dayInfo.sleepQuality} sleep` : '', dayInfo.stress != null && dayInfo.stress >= 7 ? 'stressful' : '', dayInfo.exertion ? 'exertion' : ''].filter(Boolean).join(' · ') || 'day notes'}
           </button>
         </div>

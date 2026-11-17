@@ -1,5 +1,5 @@
 import { POSTURES } from '../lib/catalog';
-import { ACTIVITY_ART, ActivityFallback, POSTURE_ART, IconTrash, IconPlus } from '../components/Icons';
+import { ACTIVITY_ART, ActivityFallback, POSTURE_ART, IconPlus } from '../components/Icons';
 import { closeSheet } from '../lib/nav';
 import { removeEntry, saveEntry } from '../lib/store';
 import { showToast } from '../components/ui';
@@ -59,17 +59,17 @@ export async function commit(e: Entry, isNew: boolean, label = 'Saved') {
   showToast(label, isNew ? { label: 'Undo', run: () => removeEntry(saved.id) } : undefined);
 }
 
-export function FormFooter({ isNew, id, onSave, saveLabel = 'Save' }: { isNew: boolean; id: string; onSave: () => void; saveLabel?: string }) {
+export function DeleteRow({ isNew, id }: { isNew: boolean; id: string }) {
+  if (isNew) return null;
   return (
-    <>
-      {!isNew && (
-        <button class="btn danger" aria-label="Delete entry" onClick={async () => {
+    <section class="section">
+      <div class="group">
+        <button class="row-item danger" onClick={async () => {
           if (confirm('Delete this entry?')) { await removeEntry(id); closeSheet(); showToast('Deleted'); }
         }}>
-          <IconTrash />
+          <span class="row-label">Delete Entry</span>
         </button>
-      )}
-      <button class="btn primary wide" onClick={onSave}>{saveLabel}</button>
-    </>
+      </div>
+    </section>
   );
 }

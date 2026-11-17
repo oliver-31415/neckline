@@ -62,8 +62,7 @@ export const HELPED_LABELS: Record<string, string> = {
 };
 
 export const STEPS: { id: StepId; label: string; hint: string }[] = [
-  { id: 'intensity', label: 'Pain level', hint: '0–10 scale' },
-  { id: 'where', label: 'Where', hint: 'Body map' },
+  { id: 'where', label: 'Body diagram', hint: 'Where you feel it' },
   { id: 'quality', label: 'What it feels like', hint: 'Aching, burning…' },
   { id: 'duration', label: 'How long it lasts', hint: '' },
   { id: 'impact', label: 'What it’s affecting', hint: 'Sleep, work…' },

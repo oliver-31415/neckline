@@ -39,7 +39,7 @@ export function entrySummary(e: Entry): { title: string; detail: string } {
       return { title: `${e.name}${e.dose ? ' · ' + e.dose : ''}`, detail: [e.helped ? HELPED_LABELS[e.helped] : 'Did it help? Tap to add', e.sideEffects.length ? 'side effects: ' + e.sideEffects.join(', ').toLowerCase() : ''].filter(Boolean).join(' · ') };
     case 'day':
       return {
-        title: 'Sleep & background',
+        title: 'Sleep & day',
         detail: [e.sleepHours != null ? `${e.sleepHours} h sleep` : '', e.sleepQuality ? `${e.sleepQuality} sleep` : '', e.stress != null ? `stress ${e.stress >= 7 ? 'high' : e.stress >= 4 ? 'medium' : 'low'}` : '', e.exertion ? 'unusual exertion' : ''].filter(Boolean).join(' · '),
       };
   }

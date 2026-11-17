@@ -7,7 +7,7 @@ import { rememberChip, rememberTreatment, settings, uid } from '../lib/store';
 import { getPhoto, putPhoto } from '../lib/db';
 import { dayKey, fmtDay, fromDayKey } from '../lib/time';
 import type { ActivityEntry, DayEntry, Helped, MealEntry, PostureEntry, TreatmentEntry } from '../lib/types';
-import { ActivityTiles, FormFooter, PostureTiles, commit } from './common';
+import { ActivityTiles, DeleteRow, PostureTiles, commit } from './common';
 
 const base = () => ({ id: uid(), time: Date.now(), createdAt: 0, updatedAt: 0, note: '' });
 
@@ -35,7 +35,7 @@ export function PostureForm({ entry }: { entry?: PostureEntry }) {
   const [d, setD] = useState<PostureEntry>(() => entry ?? { ...base(), type: 'posture', posture: '', minutes: undefined as unknown as null, breaks: null });
   const set = (p: Partial<PostureEntry>) => setD({ ...d, ...p });
   return (
-    <Sheet title={isNew ? 'Posture' : 'Edit posture'} onClose={closeSheet} tall footer={<FormFooter isNew={isNew} id={d.id} onSave={() => d.posture ? commit({ ...d, minutes: d.minutes ?? null }, isNew) : alert('Pick a posture first.')} />}>
+    <Sheet title="Posture" onClose={closeSheet} tall action={{ label: isNew ? 'Add' : 'Save', onClick: () => d.posture ? commit({ ...d, minutes: d.minutes ?? null }, isNew) : alert('Pick a posture first.') }}>
       <WhenPicker value={d.time} onChange={(time) => set({ time })} />
       <Block title="How was your head and neck mostly?">
         <PostureTiles single options={settings.value.postures} value={d.posture ? [d.posture] : []} onChange={(v) => set({ posture: v[0] ?? '' })} />
@@ -49,6 +49,7 @@ export function PostureForm({ entry }: { entry?: PostureEntry }) {
       </Block>
       <Note value={d.note} onChange={(note) => set({ note })} />
       <p class="small muted center">A rough self-report is more useful than a precise-looking guess. Phones can’t measure neck angle.</p>
+      <DeleteRow isNew={isNew} id={d.id} />
     </Sheet>
   );
 }
@@ -59,7 +60,7 @@ export function ActivityForm({ entry }: { entry?: ActivityEntry }) {
   const [d, setD] = useState<ActivityEntry>(() => entry ?? { ...base(), type: 'activity', activity: '', minutes: undefined as unknown as null, effort: null });
   const set = (p: Partial<ActivityEntry>) => setD({ ...d, ...p });
   return (
-    <Sheet title={isNew ? 'Activity' : 'Edit activity'} onClose={closeSheet} tall footer={<FormFooter isNew={isNew} id={d.id} onSave={() => d.activity ? commit({ ...d, minutes: d.minutes ?? null }, isNew) : alert('Pick an activity first.')} />}>
+    <Sheet title="Activity" onClose={closeSheet} tall action={{ label: isNew ? 'Add' : 'Save', onClick: () => d.activity ? commit({ ...d, minutes: d.minutes ?? null }, isNew) : alert('Pick an activity first.') }}>
       <WhenPicker value={d.time} onChange={(time) => set({ time })} />
       <Block title="What were you doing?">
         <ActivityTiles single options={settings.value.activities} value={d.activity ? [d.activity] : []} onChange={(v) => set({ activity: v[0] ?? '' })} onAdd={(v) => rememberChip('activities', v)} />
@@ -71,6 +72,7 @@ export function ActivityForm({ entry }: { entry?: ActivityEntry }) {
         <Seg options={[{ v: 'light', label: 'Light' }, { v: 'moderate', label: 'Moderate' }, { v: 'hard', label: 'Hard' }]} value={d.effort} onChange={(effort) => set({ effort })} />
       </Block>
       <Note value={d.note} onChange={(note) => set({ note })} />
+      <DeleteRow isNew={isNew} id={d.id} />
     </Sheet>
   );
 }
@@ -107,7 +109,7 @@ export function MealForm({ entry }: { entry?: MealEntry }) {
   }
 
   return (
-    <Sheet title={isNew ? 'Food & drink' : 'Edit meal'} onClose={closeSheet} tall footer={<FormFooter isNew={isNew} id={d.id} onSave={save} />}>
+    <Sheet title="Food & Drink" onClose={closeSheet} tall action={{ label: isNew ? 'Add' : 'Save', onClick: save }}>
       <WhenPicker value={d.time} onChange={(time) => set({ time })} />
       <Block title="Quick tags" aside="optional">
         <Chips options={settings.value.mealTags} value={d.tags} onChange={(tags) => set({ tags })} onAdd={(v) => rememberChip('mealTags', v)} />
@@ -129,6 +131,7 @@ export function MealForm({ entry }: { entry?: MealEntry }) {
         <textarea class="input" style={{ minHeight: 64 }} placeholder="e.g. pasta, coffee, a big lunch" value={d.note} onInput={(e) => set({ note: (e.target as HTMLTextAreaElement).value })} />
       </Block>
       <p class="small muted center">Logging food doesn’t assume it affects your pain. It just makes it possible to check later.</p>
+      <DeleteRow isNew={isNew} id={d.id} />
     </Sheet>
   );
 }
@@ -149,7 +152,7 @@ export function TreatmentForm({ entry }: { entry?: TreatmentEntry }) {
   }
 
   return (
-    <Sheet title={isNew ? 'Medication or treatment' : 'Edit treatment'} onClose={closeSheet} tall footer={<FormFooter isNew={isNew} id={d.id} onSave={save} />}>
+    <Sheet title="Treatment" onClose={closeSheet} tall action={{ label: isNew ? 'Add' : 'Save', onClick: save }}>
       <WhenPicker value={d.time} onChange={(time) => set({ time })} />
       {isNew && s.treatments.length > 0 && (
         <Block title="Your usual" aside="tap to fill in">
@@ -180,6 +183,7 @@ export function TreatmentForm({ entry }: { entry?: TreatmentEntry }) {
         <Chips options={s.sideEffects} value={d.sideEffects} onChange={(sideEffects) => set({ sideEffects })} onAdd={(v) => rememberChip('sideEffects', v)} />
       </Block>
       <Note value={d.note} onChange={(note) => set({ note })} />
+      <DeleteRow isNew={isNew} id={d.id} />
     </Sheet>
   );
 }
@@ -193,7 +197,7 @@ export function DayForm({ entry, date }: { entry?: DayEntry; date?: string }) {
   const set = (p: Partial<DayEntry>) => setD({ ...d, ...p });
   const hours = [4, 5, 6, 7, 8, 9, 10];
   return (
-    <Sheet title="Sleep & background" onClose={closeSheet} tall footer={<FormFooter isNew={isNew} id={d.id} onSave={() => commit({ ...d, time: fromDayKey(d.date) + 12 * 3600_000 }, isNew)} />}>
+    <Sheet title="Sleep & Day" onClose={closeSheet} tall action={{ label: isNew ? 'Add' : 'Save', onClick: () => commit({ ...d, time: fromDayKey(d.date) + 12 * 3600_000 }, isNew) }}>
       <div class="row between">
         <span class="sub">For {fmtDay(fromDayKey(d.date), { weekday: 'long', day: 'numeric', month: 'long' })}</span>
         <input type="date" class="dt-input" value={d.date} max={dayKey(Date.now())} onChange={(e) => set({ date: (e.target as HTMLInputElement).value || d.date })} />
@@ -217,6 +221,7 @@ export function DayForm({ entry, date }: { entry?: DayEntry; date?: string }) {
         <Seg options={[{ v: false as boolean | null, label: 'No' }, { v: true, label: 'Yes' }]} value={d.exertion} onChange={(exertion) => set({ exertion })} />
       </Block>
       <Note value={d.note} onChange={(note) => set({ note })} />
+      <DeleteRow isNew={isNew} id={d.id} />
     </Sheet>
   );
 }

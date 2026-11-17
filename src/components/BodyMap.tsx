@@ -1,5 +1,6 @@
 import { useRef, useState } from 'preact/hooks';
 import type { Incision, Sensation } from '../lib/types';
+import { painBg } from './ui';
 
 /*
  * Stylised upper body, front and back. Geometry is authored for the viewer's left
@@ -62,48 +63,31 @@ export function regionLabel(id: string) {
   return REGION_LABELS[id] ?? id;
 }
 
-const SENSATIONS: { id: Sensation; label: string; css: string }[] = [
-  { id: 'pain', label: 'Pain', css: 'var(--pain)' },
-  { id: 'tingling', label: 'Tingling', css: 'var(--tingling)' },
-  { id: 'numb', label: 'Numb', css: 'var(--numb)' },
-];
-const SWATCH_TEXTURE: Record<Sensation, string | undefined> = {
-  pain: undefined,
-  tingling: 'radial-gradient(circle, rgba(255,255,255,.75) 1.3px, transparent 1.6px)',
-  numb: 'repeating-linear-gradient(45deg, rgba(255,255,255,.45) 0 2px, transparent 2px 5px)',
-};
 export const SENSATION_LABEL:Record<Sensation, string> = { pain: 'pain', tingling: 'tingling', numb: 'numbness' };
 
 interface Props {
   value?: Record<string, Sensation>;
-  onChange?: (v: Record<string, Sensation>) => void;
+  levels?: Record<string, number>; // 0-10 per area, colours pain areas
+  onTap?: (id: string) => void; // makes the map interactive
   heat?: Record<string, number>; // 0..1, read-only heat map
   incision?: Incision | null;
   onPlaceIncision?: (p: { view: View; x: number; y: number }) => void;
-  compact?: boolean;
-  showBrushes?: boolean;
+  maxWidth?: number;
   initialView?: View;
 }
 
-export function BodyMap({ value = {}, onChange, heat, incision, onPlaceIncision, compact, showBrushes = true, initialView = 'front' }: Props) {
+export function BodyMap({ value = {}, levels = {}, onTap, heat, incision, onPlaceIncision, maxWidth = 260, initialView = 'front' }: Props) {
   const [view, setView] = useState<View>(incision?.view ?? initialView);
-  const [brush, setBrush] = useState<Sensation>('pain');
   const [flash, setFlash] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
-  const readOnly = !onChange;
+  const interactive = !!onTap;
 
+  const timer = useRef<number | undefined>(undefined);
   function tap(id: string) {
-    if (onPlaceIncision) return;
-    if (readOnly) {
-      setFlash(id);
-      return;
-    }
-    const next = { ...value };
-    if (next[id] === brush) delete next[id];
-    else next[id] = brush;
-    onChange!(next);
     setFlash(id);
-    navigator.vibrate?.(8);
+    clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setFlash(null), 1800);
+    onTap?.(id);
   }
 
   function svgTap(e: MouseEvent) {
@@ -120,10 +104,12 @@ export function BodyMap({ value = {}, onChange, heat, incision, onPlaceIncision,
     return 'region' + (s ? ' ' + s : '');
   };
   const style = (id: string) => {
-    if (!heat) return undefined;
-    const v = heat[id] ?? 0;
-    if (v <= 0) return undefined;
-    return { fill: `color-mix(in srgb, var(--pain) ${Math.round(18 + v * 82)}%, var(--body-fill))` };
+    if (heat) {
+      const v = heat[id] ?? 0;
+      return v > 0 ? { fill: `color-mix(in srgb, var(--pain) ${Math.round(18 + v * 82)}%, var(--body-fill))` } : undefined;
+    }
+    if (value[id] === 'pain' && levels[id] != null) return { fill: painBg(levels[id]) };
+    return undefined;
   };
   const region = (id: string, d: string, transform?: string) => (
     <path
@@ -132,9 +118,9 @@ export function BodyMap({ value = {}, onChange, heat, incision, onPlaceIncision,
       transform={transform}
       class={cls(id)}
       style={style(id)}
-      role={readOnly ? undefined : 'button'}
+      role={interactive ? 'button' : undefined}
       aria-label={regionLabel(id) + (value[id] ? `, ${SENSATION_LABEL[value[id]]}` : '')}
-      aria-pressed={readOnly ? undefined : !!value[id]}
+      aria-pressed={interactive ? !!value[id] : undefined}
       onClick={(e) => { if (onPlaceIncision) return; e.stopPropagation(); tap(id); }}
     />
   );
@@ -144,17 +130,16 @@ export function BodyMap({ value = {}, onChange, heat, incision, onPlaceIncision,
   const a = sideFor(view, 'a');
   const b = sideFor(view, 'b');
   const inc = incision && incision.view === view ? incision : null;
-  const selected = Object.entries(value);
 
   return (
     <div class="bodymap">
-      <div class="seg" role="tablist" aria-label="Body view">
+      <div class="seg" role="tablist" aria-label="Body view" style={{ alignSelf: 'center', width: 200 }}>
         <button class={view === 'front' ? 'on' : ''} onClick={() => setView('front')}>Front</button>
         <button class={view === 'back' ? 'on' : ''} onClick={() => setView('back')}>Back</button>
       </div>
 
       <div style={{ position: 'relative' }}>
-        <svg ref={svgRef} class="bodymap-svg" viewBox="10 4 300 424" style={compact ? { maxWidth: 240 } : undefined} onClick={svgTap as any}>
+        <svg ref={svgRef} class="bodymap-svg" viewBox="10 4 300 424" style={{ maxWidth }} onClick={svgTap as any}>
           <defs>
             <pattern id="pat-tingling" width="7" height="7" patternUnits="userSpaceOnUse">
               <rect width="7" height="7" fill="var(--tingling)" />
@@ -218,36 +203,13 @@ export function BodyMap({ value = {}, onChange, heat, incision, onPlaceIncision,
           <text class="side-label" x="298" y="140" text-anchor="middle">{b}</text>
         </svg>
         {flash && (
-          <div class="small center" style={{ position: 'absolute', top: 0, left: 0, right: 0, fontWeight: 650 }} aria-live="polite">
+          <div class="map-flash" aria-live="polite">
             {regionLabel(flash)}
-            {heat ? ` · ${Math.round((heat[flash] ?? 0) * 100)}% of the time` : value[flash] ? ` · ${SENSATION_LABEL[value[flash]]}` : ''}
+            {heat ? ` · ${Math.round((heat[flash] ?? 0) * 100)}% of the time` : ''}
           </div>
         )}
       </div>
 
-      {!readOnly && showBrushes && (
-        <div class="brushes" role="radiogroup" aria-label="What you feel">
-          {SENSATIONS.map((s) => (
-            <button key={s.id} class={'brush' + (brush === s.id ? ' on' : '')} role="radio" aria-checked={brush === s.id} onClick={() => setBrush(s.id)}>
-              <i style={{ backgroundColor: s.css, backgroundImage: SWATCH_TEXTURE[s.id], backgroundSize: s.id === 'tingling' ? '6px 6px' : undefined }} />
-              {s.label}
-            </button>
-          ))}
-        </div>
-      )}
-      {!readOnly && selected.length > 0 && (
-        <div class="chips">
-          {selected.map(([id, s]) => (
-            <button key={id} class="chip" onClick={() => { const n = { ...value }; delete n[id]; onChange!(n); }}>
-              <i style={{ width: 10, height: 10, borderRadius: 3, background: `var(--${s})` }} />
-              {regionLabel(id)} <span class="muted">×</span>
-            </button>
-          ))}
-        </div>
-      )}
-      {!readOnly && selected.length === 0 && !onPlaceIncision && (
-        <p class="small muted center">Tap areas to mark them. Choose Tingling or Numb first to mark those instead.</p>
-      )}
     </div>
   );
 }
