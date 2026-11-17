@@ -19,12 +19,14 @@ export async function init() {
   const merged = { ...DEFAULT_SETTINGS, ...(s ?? {}), steps: { ...DEFAULT_SETTINGS.steps, ...(s?.steps ?? {}) } };
   // Headache and migraine are always offered as symptoms.
   merged.symptoms = ['Headache', 'Migraine', ...merged.symptoms.filter((x) => x !== 'Headache' && x !== 'Migraine')];
-  if (s && (s.version ?? 1) < 2) {
+  const v = s?.version ?? 1;
+  if (s && v < 3) {
     // v2: sitting/standing postures and whole-body exercises (walks, swims…) replace the old defaults.
-    const added = ['couch', 'office', 'car', 'standing'];
+    // v3: holding grandchild.
+    const added = [...(v < 2 ? ['couch', 'office', 'car', 'standing'] : []), 'grandchild'];
     merged.postures = Object.keys(POSTURES).filter((k) => added.includes(k) || merged.postures.includes(k));
-    merged.exercises = [...DEFAULT_SETTINGS.exercises, ...merged.exercises.filter((x) => !OLD_EXERCISES.includes(x) && !DEFAULT_SETTINGS.exercises.includes(x))];
-    merged.version = 2;
+    if (v < 2) merged.exercises = [...DEFAULT_SETTINGS.exercises, ...merged.exercises.filter((x) => !OLD_EXERCISES.includes(x) && !DEFAULT_SETTINGS.exercises.includes(x))];
+    merged.version = 3;
     await db.saveSettings(merged);
   }
   settings.value = merged;

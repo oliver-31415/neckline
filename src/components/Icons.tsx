@@ -132,6 +132,12 @@ export const POSTURE_ART: Record<string, () => preact.JSX.Element> = {
       <circle cx="30" cy="9" r="4.5" /><path d="M29 14l2 14H17l-2 12M29 18l-14 2" />
     </P>
   ),
+  grandchild: () => (
+    <P>
+      <circle cx="19" cy="8" r="4.5" /><path d="M19 13v16M19 29l-5 14M19 29l5 14M19 17l8 6 4-3" />
+      <circle cx="31" cy="12" r="3.5" stroke-width="2" /><path d="M27 17c3-1 7 0 8 3s-2 5-5 5h-4" stroke-width="2" />
+    </P>
+  ),
   standing: () => (
     <P>
       <circle cx="24" cy="8" r="4.5" /><path d="M24 13v16M24 17l-7 9M24 17l7 9M24 29l-5 14M24 29l5 14" />

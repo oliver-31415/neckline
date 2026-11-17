@@ -5,6 +5,7 @@ export const POSTURES: Record<string, { label: string; hint: string }> = {
   office: { label: 'Office chair', hint: '' },
   car: { label: 'In the car', hint: '' },
   standing: { label: 'Standing', hint: '' },
+  grandchild: { label: 'Holding grandchild', hint: '' },
   neutral: { label: 'Mostly neutral', hint: 'Head balanced, looking ahead' },
   down: { label: 'Looking down', hint: 'Phone, reading, cooking' },
   up: { label: 'Looking up', hint: 'Shelves, ceilings, screens up high' },
@@ -113,7 +114,7 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
   push: { serverUrl: '', token: '', enabled: false },
   onboarded: false,
-  version: 2,
+  version: 3,
 };
 
 export function painWord(n: number | null): string {
