@@ -36,6 +36,11 @@ export const BACK_HALF: [string, string, string][] = [
   ['scapula', 'shoulder blade', 'M96 160 L136 150 L133 140 L142 140 L142 236 L108 236 C105 214 101 196 99 181 Z'],
 ];
 
+/** A soft scar line: slightly curved across the neck, straight when vertical. */
+export function incisionPath({ x, y, orient }: Incision) {
+  return orient === 'h' ? `M${x - 13} ${y - 1} Q${x} ${y + 3} ${x + 13} ${y - 1}` : `M${x} ${y - 13} V${y + 13}`;
+}
+
 export const HEAD = 'M160 14 C181 14 193 32 193 54 C193 78 179 94 160 94 C141 94 127 78 127 54 C127 32 139 14 160 14 Z';
 export const UPPER_BACK = 'M144 140 L176 140 L176 236 L144 236 Z';
 
@@ -111,12 +116,12 @@ export function BodyMap({ value = {}, levels = {}, onTap, heat, incision, onPlac
     if (value[id] === 'pain' && levels[id] != null) return { fill: painBg(levels[id]) };
     return undefined;
   };
-  const region = (id: string, d: string, transform?: string) => (
+  const region = (id: string, d: string, transform?: string, extra = '') => (
     <path
       key={id + view}
       d={d}
       transform={transform}
-      class={cls(id)}
+      class={cls(id) + extra}
       style={style(id)}
       role={interactive ? 'button' : undefined}
       aria-label={regionLabel(id) + (value[id] ? `, ${SENSATION_LABEL[value[id]]}` : '')}
@@ -183,19 +188,14 @@ export function BodyMap({ value = {}, levels = {}, onTap, heat, incision, onPlac
               <path d="M126 72 L194 72 M160 72 L160 96" stroke="var(--body-stroke)" stroke-width="2" style={{ pointerEvents: 'none' }} />
             </>
           )}
-          {view === 'front' && (
-            <g style={{ pointerEvents: 'none' }} opacity="0.35" stroke="var(--ink-2)" stroke-width="1.6" fill="none" stroke-linecap="round">
-              <path d="M147 50 q4 -3 8 0 M165 50 q4 -3 8 0 M153 74 q7 4 14 0" />
-            </g>
-          )}
 
           {/* incision site */}
           {inc && (
             <>
               {region('incision', inc.orient === 'h'
                 ? `M${inc.x - 17} ${inc.y - 5} h34 a5 5 0 0 1 0 10 h-34 a5 5 0 0 1 0 -10 Z`
-                : `M${inc.x - 5} ${inc.y - 17} a5 5 0 0 1 10 0 v34 a5 5 0 0 1 -10 0 Z`)}
-              <path class="incision" d={inc.orient === 'h' ? `M${inc.x - 13} ${inc.y} h26` : `M${inc.x} ${inc.y - 13} v26`} />
+                : `M${inc.x - 5} ${inc.y - 17} a5 5 0 0 1 10 0 v34 a5 5 0 0 1 -10 0 Z`, undefined, ' incision-area')}
+              <path class="incision" d={incisionPath(inc)} />
             </>
           )}
 

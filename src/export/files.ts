@@ -1,4 +1,4 @@
-import { ARM, BACK_HALF, FRONT_HALF, HEAD, UPPER_BACK, sideFor } from '../components/BodyMap';
+import { ARM, BACK_HALF, FRONT_HALF, HEAD, UPPER_BACK, incisionPath, sideFor } from '../components/BodyMap';
 import type { Incision } from '../lib/types';
 
 /** Hand a file to the iOS share sheet (Save to Files, Mail, AirDrop…), or download it. */
@@ -53,9 +53,11 @@ export function bodyMapSvg(heat: Record<string, number>, incision: Incision | nu
     } else s += p('head', HEAD);
     if (incision && incision.view === v) {
       const { x, y, orient } = incision;
-      const d = orient === 'h' ? `M${x - 17} ${y - 5} h34 a5 5 0 0 1 0 10 h-34 a5 5 0 0 1 0 -10 Z` : `M${x - 5} ${y - 17} a5 5 0 0 1 10 0 v34 a5 5 0 0 1 -10 0 Z`;
-      s += p('incision', d);
-      s += `<path d="${orient === 'h' ? `M${x - 13} ${y} h26` : `M${x} ${y - 13} v26`}" stroke="#1b1b1a" stroke-width="2.5" stroke-dasharray="2 4" stroke-linecap="round"/>`;
+      if (heat.incision) {
+        const d = orient === 'h' ? `M${x - 17} ${y - 5} h34 a5 5 0 0 1 0 10 h-34 a5 5 0 0 1 0 -10 Z` : `M${x - 5} ${y - 17} a5 5 0 0 1 10 0 v34 a5 5 0 0 1 -10 0 Z`;
+        s += p('incision', d);
+      }
+      s += `<path d="${incisionPath(incision)}" stroke="#6c6c70" stroke-width="1.8" stroke-linecap="round" fill="none" opacity=".7"/>`;
     }
     s += `<text x="22" y="140" font-size="14" font-weight="700" fill="#8b8881" text-anchor="middle" font-family="Helvetica, Arial">${a}</text>`;
     s += `<text x="298" y="140" font-size="14" font-weight="700" fill="#8b8881" text-anchor="middle" font-family="Helvetica, Arial">${b}</text>`;

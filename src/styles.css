@@ -293,7 +293,8 @@ textarea.input { min-height: 88px; resize: vertical; }
 .bodymap-svg .region.numb { fill: url(#pat-numb); }
 .bodymap-svg .deco { fill: var(--body-fill); opacity: 0.55; pointer-events: none; }
 .bodymap-svg .side-label { fill: var(--muted); font-size: 13px; font-weight: 600; }
-.bodymap-svg .incision { stroke: var(--ink); stroke-width: 2.5; stroke-dasharray: 2 4; stroke-linecap: round; fill: none; pointer-events: none; }
+.bodymap-svg .incision { stroke: var(--ink-2); stroke-width: 1.8; stroke-linecap: round; fill: none; pointer-events: none; opacity: 0.7; }
+.bodymap-svg .region.incision-area:not(.pain):not(.tingling):not(.numb) { fill: transparent; stroke: none; }
 .map-flash { position: absolute; top: 0; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--surface); font-size: 13px; font-weight: 600; padding: 5px 11px; border-radius: 999px; white-space: nowrap; animation: fade 0.15s; pointer-events: none; }
 
 /* ---------- picture tiles ---------- */
