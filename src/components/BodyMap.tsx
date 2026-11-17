@@ -100,6 +100,30 @@ export function regionLabel(id: string) {
   return REGION_LABELS[id] ?? id;
 }
 
+const spineIndex = (id: string) => (id.startsWith('spine-') ? SPINE.indexOf(id.slice(6)) : -1);
+
+/** "Spine C3–C6" for a run of vertebrae. */
+export function spineRangeLabel(from: number, to: number) {
+  const [a, b] = from <= to ? [from, to] : [to, from];
+  return a === b ? `Spine ${SPINE[a]}` : `Spine ${SPINE[a]}–${SPINE[b]}`;
+}
+
+/** Area names with neighbouring vertebrae collapsed into ranges. */
+export function regionNames(ids: string[]) {
+  const spine = ids.map(spineIndex).filter((i) => i >= 0).sort((a, b) => a - b);
+  const runs: string[] = [];
+  for (let k = 0; k < spine.length; k++) {
+    let e = k;
+    while (e + 1 < spine.length && spine[e + 1] === spine[e] + 1) e++;
+    runs.push(spineRangeLabel(spine[k], spine[e]));
+    k = e;
+  }
+  const spineAt = ids.findIndex((id) => spineIndex(id) >= 0);
+  const out = ids.filter((id) => spineIndex(id) < 0).map(regionLabel);
+  if (spineAt >= 0) out.splice(Math.min(spineAt, out.length), 0, ...runs);
+  return out;
+}
+
 export const SENSATION_LABEL: Record<Sensation, string> = {
   ache: 'ache', nerve: 'sharp nerve pain', tingling: 'tingling', cramp: 'cramping', stiff: 'stiffness', pain: 'pain', numb: 'numbness',
 };
@@ -108,23 +132,88 @@ interface Props {
   value?: Record<string, Sensation>;
   levels?: Record<string, number>; // 0-10 per area
   onTap?: (id: string) => void; // makes the map interactive
+  onRange?: (ids: string[]) => void; // a drag along the spine
   heat?: Record<string, number>; // 0..1, read-only heat map
   incision?: Incision | null;
 }
 
-export function BodyMap({ value = {}, levels = {}, onTap, heat, incision = null }: Props) {
+export function BodyMap({ value = {}, levels = {}, onTap, onRange, heat, incision = null }: Props) {
   const [view, setView] = useState<View>('back');
   const [flash, setFlash] = useState<string | null>(null);
+  const [drag, setDrag] = useState<{ from: number; to: number } | null>(null);
   const timer = useRef<number | undefined>(undefined);
+  const neckSvg = useRef<SVGSVGElement>(null);
   const interactive = !!onTap;
   const front = view === 'front';
 
-  function tap(id: string) {
-    setFlash(id);
+  function showFlash(text: string, ms = 1600) {
+    setFlash(text);
     clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => setFlash(null), 1600);
+    timer.current = window.setTimeout(() => setFlash(null), ms);
+  }
+  function tap(id: string) {
+    showFlash(regionLabel(id) + (heat ? ` · ${Math.round((heat[id] ?? 0) * 100)}%` : ''));
     onTap?.(id);
     navigator.vibrate?.(8);
+  }
+
+  // A finger on the spine drags out a range instead of scrolling the page.
+  useEffect(() => {
+    const el = neckSvg.current;
+    if (!el || !interactive) return;
+    const stop = (e: TouchEvent) => { if (e.touches.length === 1 && (e.target as Element).closest?.('[data-v]')) e.preventDefault(); };
+    el.addEventListener('touchstart', stop, { passive: false });
+    return () => el.removeEventListener('touchstart', stop);
+  }, [view, interactive]);
+
+  /** Vertebra under a screen y position. */
+  function vertAt(clientY: number) {
+    const r = neckSvg.current!.getBoundingClientRect();
+    const k = Math.min(r.width / 200, r.height / 280);
+    const y = 4 + (clientY - r.top - (r.height - 280 * k) / 2) / k;
+    let i = 0;
+    for (let j = 0; j < SPINE.length; j++) if (y >= vertebra(j).top) i = j;
+    return i;
+  }
+
+  function startDrag(e: PointerEvent, from: number) {
+    if (!interactive || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    const id = e.pointerId;
+    let to = from;
+    setDrag({ from, to });
+    const done = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', done);
+      window.removeEventListener('pointerdown', other, true);
+      setDrag(null);
+    };
+    const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== id) return;
+      const t = vertAt(ev.clientY);
+      if (t === to) return;
+      to = t;
+      setDrag({ from, to });
+      showFlash(spineRangeLabel(from, to), 4000);
+      navigator.vibrate?.(4);
+    };
+    const up = (ev: PointerEvent) => {
+      if (ev.pointerId !== id) return;
+      done();
+      if (from === to) return tap(`spine-${SPINE[from]}`);
+      const [a, b] = from < to ? [from, to] : [to, from];
+      const ids = SPINE.slice(a, b + 1).map((v) => `spine-${v}`);
+      showFlash(spineRangeLabel(a, b));
+      if (onRange) onRange(ids);
+      else ids.forEach((x) => onTap?.(x));
+      navigator.vibrate?.(10);
+    };
+    // A second finger means a pinch: drop the drag.
+    const other = (ev: PointerEvent) => { if (ev.pointerId !== id) done(); };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', done);
+    window.addEventListener('pointerdown', other, true);
   }
 
   const style = (id: string) => {
@@ -147,7 +236,7 @@ export function BodyMap({ value = {}, levels = {}, onTap, heat, incision = null 
 
   const neckPanel = (
     <figure>
-      <svg class="bodymap-svg" viewBox="0 4 200 280">
+      <svg class="bodymap-svg" viewBox="0 4 200 280" ref={neckSvg}>
         <Defs />
         <g mask="url(#fade-bottom)">
           {front ? (
@@ -161,10 +250,16 @@ export function BodyMap({ value = {}, levels = {}, onTap, heat, incision = null 
               {SPINE.map((v, i) => {
                 const id = `spine-${v}`;
                 const vt = vertebra(i);
+                const inDrag = drag && i >= Math.min(drag.from, drag.to) && i <= Math.max(drag.from, drag.to);
                 return (
-                  <g key={id} {...a11y(id)}>
+                  <g
+                    key={id} data-v={i} {...a11y(id)}
+                    // Mouse and touch go through the drag handler; click only fires here from the keyboard.
+                    onClick={(e) => { e.stopPropagation(); if (e.detail === 0) tap(id); }}
+                    onPointerDown={(e) => startDrag(e as unknown as PointerEvent, i)}
+                  >
                     <rect x="88" y={vt.top} width="24" height={vt.step} fill="transparent" />
-                    <path d={vt.d} class="vert" style={style(id)} />
+                    <path d={vt.d} class={'vert' + (inDrag ? ' drag' : '')} style={style(id)} />
                   </g>
                 );
               })}
@@ -189,7 +284,7 @@ export function BodyMap({ value = {}, levels = {}, onTap, heat, incision = null 
           {front ? <>{armPanel}{neckPanel}</> : <>{neckPanel}{armPanel}</>}
         </div>
       </Zoomable>
-      {flash && <div class="map-flash" aria-live="polite">{regionLabel(flash)}{heat ? ` · ${Math.round((heat[flash] ?? 0) * 100)}%` : ''}</div>}
+      {flash && <div class="map-flash" aria-live="polite">{flash}</div>}
       <div class="bodymap-foot">
         <div class="seg">
           <button class={!front ? 'on' : ''} onClick={() => setView('back')}>Back</button>
@@ -270,7 +365,7 @@ function Zoomable({ children }: { children: ComponentChildren }) {
         const a = at(e.touches[0]), b = at(e.touches[1]);
         start = { ...cur, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2, d: Math.hypot(a.x - b.x, a.y - b.y) || 1, n: 2, moved: true };
         e.preventDefault();
-      } else if (e.touches.length === 1 && cur.s > 1) {
+      } else if (e.touches.length === 1 && cur.s > 1 && !(e.target as Element).closest?.('[data-v]')) {
         const a = at(e.touches[0]);
         start = { ...cur, mx: a.x, my: a.y, d: 0, n: 1, moved: false };
       } else start = null;

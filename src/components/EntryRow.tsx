@@ -4,7 +4,7 @@ import { HELPED_LABELS, POSTURES, painWord } from '../lib/catalog';
 import { fmtMinutes, fmtTime } from '../lib/time';
 import { editEntry } from '../lib/nav';
 import { getPhoto } from '../lib/db';
-import { regionLabel } from './BodyMap';
+import { regionNames } from './BodyMap';
 import { entryKindLabels } from '../lib/analysis';
 import { PainPill } from './ui';
 import { IconActivity, IconMeal, IconMoon, IconPill, IconPosture } from './Icons';
@@ -21,8 +21,8 @@ export function entrySummary(e: Entry): { title: string; detail: string } {
   switch (e.type) {
     case 'pain': {
       const parts: string[] = [];
-      const regions = Object.keys(e.regions);
-      if (regions.length) parts.push(regions.length <= 2 ? regions.map(regionLabel).join(', ') : `${regionLabel(regions[0])} +${regions.length - 1} more`);
+      const regions = regionNames(Object.keys(e.regions));
+      if (regions.length) parts.push(regions.length <= 2 ? regions.join(', ') : `${regions[0]} +${regions.length - 1} more`);
       const kinds = entryKindLabels(e);
       if (kinds.length) parts.push(kinds.join(', ').toLowerCase());
       if (e.symptoms.length) parts.push(e.symptoms.join(', ').toLowerCase());

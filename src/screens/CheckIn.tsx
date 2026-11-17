@@ -6,7 +6,7 @@ import { AREA_KINDS, DURATIONS, IMPACTS, MAIN_SYMPTOMS } from '../lib/catalog';
 import { ago, fmtSlot, fmtTime } from '../lib/time';
 import { slotStatus } from '../lib/env';
 import type { Level, PainEntry, Sensation } from '../lib/types';
-import { BodyMap, SPINE, regionLabel } from '../components/BodyMap';
+import { BodyMap, SPINE, regionLabel, spineRangeLabel } from '../components/BodyMap';
 import { Chips, PainPill, PainSlider, Seg, Sheet, WhenPicker, showToast } from '../components/ui';
 import { IconChevron, IconClose, IconDownChev, IconGear, IconPlus, IconUpChev } from '../components/Icons';
 import { ActivityTiles } from '../forms/common';
@@ -35,6 +35,36 @@ function KindChips({ value, onChange }: { value: Sensation[]; onChange: (v: Sens
       })}
     </div>
   );
+}
+
+const spineIdx = (id: string) => SPINE.indexOf(id.slice(6));
+const byIdx = (a: string, b: string) => spineIdx(a) - spineIdx(b);
+
+/** Linked vertebrae as runs of neighbours that are still marked (a gap splits a run; one alone isn't a group). */
+function groupsOf(links: string[][], regions: Draft['regions']) {
+  const out: string[][] = [];
+  for (const g of links) {
+    let run: string[] = [];
+    for (const id of g.filter((x) => regions[x]).sort(byIdx)) {
+      if (run.length && spineIdx(id) !== spineIdx(run[run.length - 1]) + 1) { if (run.length > 1) out.push(run); run = []; }
+      run.push(id);
+    }
+    if (run.length > 1) out.push(run);
+  }
+  return out;
+}
+
+/** When reopening an entry: neighbouring vertebrae with the same level and pain types go back together. */
+function initialLinks(d: Draft) {
+  const ids = Object.keys(d.regions).filter((id) => id.startsWith('spine-')).sort(byIdx);
+  const same = (a: string, b: string) => spineIdx(b) === spineIdx(a) + 1 && d.levels[a] === d.levels[b] && [...(d.kinds[a] ?? [])].sort().join() === [...(d.kinds[b] ?? [])].sort().join();
+  const out: string[][] = [];
+  for (const id of ids) {
+    const last = out[out.length - 1];
+    if (last && same(last[last.length - 1], id)) last.push(id);
+    else out.push([id]);
+  }
+  return out.filter((g) => g.length > 1);
 }
 
 /** Headache and migraine as chips; every other symptom is picked from a dropdown or typed in. */
@@ -92,37 +122,77 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
   const [timeSet, setTimeSet] = useState(editing);
   const [open, setOpen] = useState<Detail | null>(null);
   const [extras, setExtras] = useState<Item[]>([]);
+  const [links, setLinks] = useState<string[][]>(() => initialLinks(d));
   const set = (p: Partial<Draft>) => setD({ ...d, ...p });
 
   const regionIds = Object.keys(d.regions);
   const painTouched = d.trend != null || regionIds.length > 0 || d.qualities.length + d.symptoms.length + d.postures.length + d.activities.length > 0 || !!d.note || !!d.duration || Object.values(d.impacts).some((v) => v != null);
   const touched = painTouched || extras.length > 0;
 
-  /** Move a marked vertebra up (-1) or down (+1) the spine, keeping its level and sensation. */
-  function moveSpine(id: string, dir: -1 | 1) {
-    const i = SPINE.indexOf(id.slice(6)) + dir;
-    const to = `spine-${SPINE[i]}`;
-    if (i < 0 || i >= SPINE.length || d.regions[to]) return;
+  const groups = groupsOf(links, d.regions);
+  const groupOf = new Map(groups.flatMap((g) => g.map((id) => [id, g] as const)));
+
+  /** Move marked vertebrae (one, or a linked run) up (-1) or down (+1) the spine, keeping levels and pain types. */
+  function moveSpine(ids: string[], dir: -1 | 1) {
+    const map = new Map(ids.map((id) => [id, `spine-${SPINE[spineIdx(id) + dir]}`]));
+    if ([...map.values()].some((to) => to === 'spine-undefined' || (d.regions[to] && !map.has(to)))) return;
     const regions: Draft['regions'] = {};
     const levels: Draft['levels'] = {};
     const kinds: Draft['kinds'] = {};
     for (const k of Object.keys(d.regions)) {
-      const nk = k === id ? to : k;
+      const nk = map.get(k) ?? k;
       regions[nk] = d.regions[k];
       if (d.levels[k] != null) levels[nk] = d.levels[k];
       if (d.kinds[k]) kinds[nk] = d.kinds[k];
     }
     set({ regions, levels, kinds });
+    setLinks(links.map((g) => (g.some((x) => map.has(x)) ? g.map((x) => map.get(x) ?? x) : g)));
   }
 
   function tapRegion(id: string) {
     const regions = { ...d.regions };
     const levels = { ...d.levels };
     const kinds = { ...d.kinds };
-    if (regions[id]) { delete regions[id]; delete levels[id]; delete kinds[id]; }
+    if (regions[id]) { delete regions[id]; delete levels[id]; delete kinds[id]; setLinks(links.map((g) => g.filter((x) => x !== id))); }
     else { regions[id] = 'pain'; levels[id] = 5; kinds[id] = []; }
     set({ regions, levels, kinds });
     navigator.vibrate?.(8);
+  }
+
+  /** A drag along the spine: mark every vertebra in it with one shared level and pain types. */
+  function addRange(ids: string[]) {
+    const first = ids.find((id) => d.regions[id]);
+    const level = first ? d.levels[first] ?? 5 : 5;
+    const ks = first ? d.kinds[first] ?? [] : [];
+    const regions = { ...d.regions };
+    const levels = { ...d.levels };
+    const kinds = { ...d.kinds };
+    for (const id of ids) { regions[id] = ks[0] ?? 'pain'; levels[id] = level; kinds[id] = [...ks]; }
+    set({ regions, levels, kinds });
+    setLinks([...links.map((g) => g.filter((x) => !ids.includes(x))), ids]);
+  }
+
+  /** Apply a change to one area, or to every vertebra in its linked run. */
+  function setArea(id: string, patch: { level?: number; kinds?: Sensation[] }) {
+    const ids = groupOf.get(id) ?? [id];
+    const levels = { ...d.levels };
+    const kinds = { ...d.kinds };
+    const regions = { ...d.regions };
+    for (const x of ids) {
+      if (patch.level != null) levels[x] = patch.level;
+      if (patch.kinds) { kinds[x] = [...patch.kinds]; regions[x] = patch.kinds[0] ?? 'pain'; }
+    }
+    set({ levels, kinds, regions });
+  }
+
+  function removeArea(id: string) {
+    const ids = groupOf.get(id) ?? [id];
+    const regions = { ...d.regions };
+    const levels = { ...d.levels };
+    const kinds = { ...d.kinds };
+    for (const x of ids) { delete regions[x]; delete levels[x]; delete kinds[x]; }
+    set({ regions, levels, kinds });
+    setLinks(links.map((g) => g.filter((x) => !ids.includes(x))));
   }
 
   async function save() {
@@ -144,6 +214,7 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
     pendingSlot.value = null;
     setD(blank());
     setExtras([]);
+    setLinks([]);
     setTimeSet(false);
     setOpen(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -156,27 +227,35 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
       {s.steps.where && (
         <section class="section">
           <div class="group pad tight">
-            <BodyMap value={d.regions} levels={d.levels} onTap={tapRegion} incision={s.incision} />
+            <BodyMap value={d.regions} levels={d.levels} onTap={tapRegion} onRange={addRange} incision={s.incision} />
           </div>
           {regionIds.length > 0 && (
             <div class="group" style={{ marginTop: 8 }}>
-              {regionIds.map((id) => (
-                <div class="arow" key={id}>
-                  <div class="arow-line">
-                    <span class="arow-label">{regionLabel(id)}</span>
-                    <PainSlider value={d.levels[id]} onChange={(v) => set({ levels: { ...d.levels, [id]: v } })} label={regionLabel(id)} />
-                    {id.startsWith('spine-') && (
-                      <span class="spine-step">
-                        <button class="x-btn" aria-label="One vertebra higher" onClick={() => moveSpine(id, -1)}><IconUpChev /></button>
-                        <button class="x-btn" aria-label="One vertebra lower" onClick={() => moveSpine(id, 1)}><IconDownChev /></button>
-                      </span>
-                    )}
-                    <PainPill n={d.levels[id] ?? null} />
-                    <button class="x-btn" aria-label={`Remove ${regionLabel(id)}`} onClick={() => tapRegion(id)}><IconClose /></button>
+              {regionIds.filter((id) => (groupOf.get(id)?.[0] ?? id) === id).map((id) => {
+                const g = groupOf.get(id);
+                const label = g ? spineRangeLabel(spineIdx(g[0]), spineIdx(g[g.length - 1])) : regionLabel(id);
+                return (
+                  <div class="arow" key={g ? g.join() : id}>
+                    <div class="arow-line">
+                      {g ? (
+                        <button class="arow-label group-label" aria-label={`${label}, ${g.length} vertebrae. Separate`} onClick={() => setLinks(links.filter((x) => !x.some((y) => g.includes(y))))}>
+                          {label}<span class="group-count">{g.length}</span>
+                        </button>
+                      ) : <span class="arow-label">{label}</span>}
+                      <PainSlider value={d.levels[id]} onChange={(level) => setArea(id, { level })} label={label} />
+                      {id.startsWith('spine-') && (
+                        <span class="spine-step">
+                          <button class="x-btn" aria-label="One vertebra higher" onClick={() => moveSpine(g ?? [id], -1)}><IconUpChev /></button>
+                          <button class="x-btn" aria-label="One vertebra lower" onClick={() => moveSpine(g ?? [id], 1)}><IconDownChev /></button>
+                        </span>
+                      )}
+                      <PainPill n={d.levels[id] ?? null} />
+                      <button class="x-btn" aria-label={`Remove ${label}`} onClick={() => removeArea(id)}><IconClose /></button>
+                    </div>
+                    <KindChips value={d.kinds[id] ?? []} onChange={(kinds) => setArea(id, { kinds })} />
                   </div>
-                  <KindChips value={d.kinds[id] ?? []} onChange={(ks) => set({ kinds: { ...d.kinds, [id]: ks }, regions: { ...d.regions, [id]: ks[0] ?? 'pain' } })} />
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>

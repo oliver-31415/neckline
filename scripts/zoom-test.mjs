@@ -21,9 +21,9 @@ await page.screenshot({ path: 'shots/13-zoomed.png' });
 await page.touchscreen.tap(cx, cy + 10);
 await page.waitForTimeout(200);
 console.log('marked while zoomed:', await page.locator('.arow-label').allTextContents());
-// One-finger drag pans.
-await touch('touchStart', [[cx, cy]]);
-for (let i = 1; i <= 6; i++) await touch('touchMove', [[cx + i * 10, cy + i * 10]]);
+// One-finger drag off the spine pans (on the spine it selects a range).
+await touch('touchStart', [[cx - 120, cy]]);
+for (let i = 1; i <= 6; i++) await touch('touchMove', [[cx - 120 + i * 10, cy + i * 10]]);
 await touch('touchEnd', []);
 console.log('after drag:', await page.locator('.zoom-inner').evaluate((el) => el.style.transform), '| marked:', (await page.locator('.arow-label').allTextContents()).length);
 await page.click('[aria-label="Zoom out fully"]');
