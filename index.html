@@ -19,6 +19,18 @@
   </head>
   <body>
     <div id="app"></div>
+    <script>
+      // Safety net: if the app hasn't started after 6 s (e.g. a stale offline copy), clear the
+      // offline file cache once and reload. Diary data lives in IndexedDB and is not touched.
+      setTimeout(function () {
+        var app = document.getElementById('app');
+        if (app && app.childElementCount) return;
+        try { if (sessionStorage.getItem('nl-rescued')) return; sessionStorage.setItem('nl-rescued', '1'); } catch (e) {}
+        var sw = navigator.serviceWorker ? navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { return r.unregister(); })); }) : null;
+        var cs = window.caches ? caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }) : null;
+        Promise.all([sw, cs]).then(function () { location.reload(); }, function () { location.reload(); });
+      }, 6000);
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

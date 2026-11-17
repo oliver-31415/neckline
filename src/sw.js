@@ -3,16 +3,24 @@
 const VERSION = '__VERSION__';
 const CACHE = 'neckline-' + VERSION;
 const PRECACHE = __PRECACHE__;
+const KEEP = 2; // keep the previous version too, so a page that's already open can still load its chunks
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(PRECACHE)));
+  event.waitUntil(
+    caches.open(CACHE)
+      // 'reload' skips the browser's HTTP cache so we never store a stale index.html
+      .then((c) => c.addAll(PRECACHE.map((u) => new Request(u, { cache: 'reload' }))))
+      .then(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('neckline-') && k !== CACHE).map((k) => caches.delete(k))),
-    ).then(() => self.clients.claim()),
+    caches.keys().then((keys) => {
+      const ours = keys.filter((k) => k.startsWith('neckline-'));
+      const old = ours.filter((k) => k !== CACHE).slice(0, Math.max(0, ours.length - KEEP));
+      return Promise.all(old.map((k) => caches.delete(k)));
+    }).then(() => self.clients.claim()),
   );
 });
 
@@ -26,10 +34,30 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
   if (req.mode === 'navigate') {
-    event.respondWith(caches.match('./', { ignoreSearch: true }).then((r) => r || fetch(req)));
+    // Network first for the page itself, so a new deploy is picked up straight away; cache when offline.
+    event.respondWith(
+      fetch(req.url, { cache: 'no-cache' })
+        .then((res) => {
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put('./', copy));
+          }
+          return res;
+        })
+        .catch(() => caches.match('./', { cacheName: CACHE }).then((r) => r || caches.match('./', { ignoreSearch: true }))),
+    );
     return;
   }
-  event.respondWith(caches.match(req, { ignoreSearch: true }).then((r) => r || fetch(req)));
+  // Hashed assets never change, so cache first (any version), then network.
+  event.respondWith(
+    caches.match(req, { ignoreSearch: true }).then((r) => r || fetch(req).then((res) => {
+      if (res.ok && url.pathname.includes('/assets/')) {
+        const copy = res.clone();
+        caches.open(CACHE).then((c) => c.put(req, copy));
+      }
+      return res;
+    })),
+  );
 });
 
 self.addEventListener('push', (event) => {
@@ -38,7 +66,7 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'Neck check-in';
   event.waitUntil(
     self.registration.showNotification(title, {
-      body: data.body || 'How is your neck right now? A quick check-in takes about 20 seconds.',
+      body: data.body || 'How is your neck right now?',
       icon: './icons/icon-192.png',
       badge: './icons/icon-192.png',
       tag: 'neckline-checkin',

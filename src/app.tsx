@@ -115,16 +115,10 @@ function AddMenu() {
 
 export function registerSW() {
   if (!('serviceWorker' in navigator) || import.meta.env.DEV) return;
-  // Only reload for updates; the very first install shouldn't interrupt someone mid check-in.
   const hadController = !!navigator.serviceWorker.controller;
-  navigator.serviceWorker.register('./sw.js').then((reg) => {
-    const offer = (w: ServiceWorker) => showToast('Update ready', { label: 'Reload', run: () => w.postMessage('skip-waiting') });
-    if (reg.waiting && navigator.serviceWorker.controller) offer(reg.waiting);
-    reg.addEventListener('updatefound', () => {
-      const w = reg.installing;
-      w?.addEventListener('statechange', () => w.state === 'installed' && navigator.serviceWorker.controller && offer(w));
-    });
-    let reloaded = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !reloaded) { reloaded = true; location.reload(); } });
-  }).catch(() => {});
+  // The worker activates new versions itself; offer a reload rather than interrupting a check-in.
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (hadController) showToast('Updated', { label: 'Reload', run: () => location.reload() });
+  });
+  navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(() => {});
 }
