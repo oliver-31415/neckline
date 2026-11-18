@@ -5,7 +5,7 @@ const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceSc
 const page = await ctx.newPage();
 await page.goto(process.argv[2] ?? 'http://localhost:4173/#/checkin');
 await page.waitForTimeout(800);
-await page.click('.log-pick button:has-text("Symptom")');
+await page.click('.log-pick button:has-text("Pain")');
 await page.waitForTimeout(200);
 const cdp = await ctx.newCDPSession(page);
 const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map(([x, y], id) => ({ x, y, id })) });
@@ -31,12 +31,14 @@ const sl = page.locator('.arow').first().locator('.slider');
 await sl.evaluate((el) => el.scrollIntoView({ block: 'center' }));
 const sb = await sl.boundingBox();
 await page.touchscreen.tap(sb.x + sb.width * 0.8, sb.y + sb.height / 2);
-await page.locator('.arow').first().locator('.kind:has-text("Stiff")').tap();
+await page.locator('.arow').first().locator('.feels').tap();
+await page.locator('.menu-item:has-text("Stiffness")').tap();
+await page.mouse.click(8, 8);
 await page.screenshot({ path: 'shots/14-spine-range.png' });
 await page.locator('.group-label').tap();
 await page.waitForTimeout(150);
 console.log('after separate:', await rows(), '| scores:', await page.locator('.arow .pain-pill').allTextContents());
-console.log('stiff on all:', (await page.locator('.arow .kind.on:has-text("Stiff")').count()));
+console.log('stiff on all:', (await page.locator('.arow .feels:has-text("Stiff")').count()));
 
 // Tapping one vertebra still toggles just that one.
 await page.locator('.bodymap-svg').first().evaluate((el) => el.scrollIntoView({ block: 'center' }));

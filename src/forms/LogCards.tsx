@@ -1,34 +1,35 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { POSTURES } from '../lib/catalog';
 import { rememberChip, rememberTreatment, settings, uid } from '../lib/store';
-import { HOUR, fmtMinutes, fromLocalInput, toLocalInput } from '../lib/time';
+import { HOUR, fmtDayRelative, fmtMinutes, fmtTime, fromLocalInput, toLocalInput } from '../lib/time';
 import type { PostureEntry, TreatmentEntry } from '../lib/types';
-import { ActivityFallback, IconClose, IconExercise, IconPill, IconPosture, IconPulse, POSTURE_ART } from '../components/Icons';
+import { IconBody, IconClose, IconPill, IconPosture, IconSymptom } from '../components/Icons';
+import { MenuRow, type MenuItem } from '../components/Menu';
 
 /*
- * The home screen is built from cards: a symptom, a posture, a medication or an exercise.
+ * The home screen is built from cards: pain, a symptom, a medication, or a posture/exercise.
  * Any number can be stacked and saved together; each keeps its own time and length.
  */
 
-export type CardKind = 'symptom' | 'posture' | 'med' | 'exercise';
-/** when: null means "now", resolved at save time. */
-export interface PostureCard { key: string; kind: 'posture'; posture?: string; when: number | null; minutes?: number }
-export interface MedCard { key: string; kind: 'med'; name?: string; dose: string; when: number | null }
-export interface ExerciseCard { key: string; kind: 'exercise'; name?: string; when: number | null; minutes?: number; hold?: number }
-export type OtherCard = PostureCard | MedCard | ExerciseCard;
+export type CardKind = 'pain' | 'symptom' | 'med' | 'move';
+/** when: null means "now", resolved at save time. fresh: just added, so its first menu opens by itself. */
+export interface MedCard { key: string; kind: 'med'; fresh?: boolean; name?: string; dose: string; when: number | null }
+/** pick: "p:<posture id>" or "x:<exercise name>". */
+export interface MoveCard { key: string; kind: 'move'; fresh?: boolean; pick?: string; when: number | null; minutes?: number; hold?: number }
+export type OtherCard = MedCard | MoveCard;
 
 export const CARD_STYLE: Record<CardKind, { label: string; color: string; Icon: () => preact.JSX.Element }> = {
-  symptom: { label: 'Symptom', color: 'var(--pain)', Icon: IconPulse },
-  posture: { label: 'Posture', color: 'var(--posture)', Icon: IconPosture },
+  pain: { label: 'Pain', color: 'var(--pain)', Icon: IconBody },
+  symptom: { label: 'Symptom', color: 'var(--symptom)', Icon: IconSymptom },
   med: { label: 'Medication', color: 'var(--treatment)', Icon: IconPill },
-  exercise: { label: 'Exercise', color: 'var(--activity)', Icon: IconExercise },
+  move: { label: 'Posture or exercise', color: 'var(--posture)', Icon: IconPosture },
 };
 
-const HELD = [5, 15, 30, 60, 120, 180, 240];
-const DONE_FOR = [10, 20, 30, 45, 60, 90, 120];
-const HOLDS = [5, 10, 20, 30, 60];
-const AGO = [0, 0.5, 1, 2, 4, 8, 24];
+const FOR = [5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240, 360];
+const HOLDS = [5, 10, 15, 20, 30, 45, 60];
+const AGO = [0, 0.25, 0.5, 1, 2, 3, 4, 6, 8, 12, 24];
+const agoLabel = (h: number) => (h === 0 ? 'Now' : h === 24 ? 'Yesterday, same time' : h < 1 ? `${h * 60} min ago` : `${h} h ago`);
 
 /** Stretch-type exercises also get a "hold" row. */
 const hasHolds = (name: string) => /stretch|physio|yoga|pilates|tuck|glide|hold/i.test(name);
@@ -37,77 +38,101 @@ export function exerciseDose(minutes: number | null | undefined, hold: number | 
   return [minutes ? `${minutes} min` : '', hold ? `${hold} s holds` : ''].filter(Boolean).join(', ');
 }
 
+export const moveLabel = (pick: string) => (pick.startsWith('p:') ? POSTURES[pick.slice(2)]?.label ?? pick.slice(2) : pick.slice(2));
+
 export function cardReady(c: OtherCard) {
-  return c.kind === 'posture' ? !!c.posture : !!c.name;
+  return c.kind === 'move' ? !!c.pick : !!c.name;
 }
 
 /** Turns a finished card into a diary entry. A posture or exercise logged "now" with a length is taken to have just ended. */
 export function cardEntry(c: OtherCard, now: number, group?: string): PostureEntry | TreatmentEntry {
   const base = (time: number) => ({ id: uid(), time, createdAt: 0, updatedAt: 0, note: '', group });
-  const start = (minutes?: number) => c.when ?? now - (minutes ?? 0) * 60_000;
-  if (c.kind === 'posture') {
-    return { ...base(start(c.minutes)), type: 'posture', posture: c.posture!, minutes: c.minutes ?? null, breaks: null };
-  }
   if (c.kind === 'med') {
     rememberTreatment(c.name!, 'medication', c.dose.trim() || undefined);
     return { ...base(c.when ?? now), type: 'treatment', kind: 'medication', name: c.name!, dose: c.dose.trim(), helped: null, sideEffects: [] };
   }
+  const start = c.when ?? now - (c.minutes ?? 0) * 60_000;
+  if (c.pick!.startsWith('p:')) {
+    return { ...base(start), type: 'posture', posture: c.pick!.slice(2), minutes: c.minutes ?? null, breaks: null };
+  }
   return {
-    ...base(start(c.minutes)), type: 'treatment', kind: 'exercises', name: c.name!,
+    ...base(start), type: 'treatment', kind: 'exercises', name: c.pick!.slice(2),
     dose: exerciseDose(c.minutes, c.hold), minutes: c.minutes ?? null, holdSeconds: c.hold ?? null, helped: null, sideEffects: [],
   };
 }
 
-/** One-tap choices in a horizontally scrolling row; tapping the chosen one clears it. */
-export function Pick<T extends string | number>({ options, value, onChange }: { options: { v: T; label: string }[]; value: T | undefined | null; onChange: (v: T | undefined) => void }) {
+/** Label on the left, a text field on the right, like an iOS form row. */
+export function TextRow({ label, value, onInput, onDone, placeholder, autoFocus }: {
+  label: string; value: string; onInput: (v: string) => void; onDone?: () => void; placeholder?: string; autoFocus?: boolean;
+}) {
   return (
-    <div class="kinds">
-      {options.map((o) => (
-        <button key={String(o.v)} class={'kind' + (value === o.v ? ' on' : '')} aria-pressed={value === o.v} onClick={() => onChange(value === o.v ? undefined : o.v)}>{o.label}</button>
-      ))}
-    </div>
+    <label class="trow">
+      <span class="mrow-label">{label}</span>
+      <input
+        class="trow-input" value={value} placeholder={placeholder} autoFocus={autoFocus} autocomplete="off" enterkeyhint="done"
+        onInput={(e) => onInput((e.target as HTMLInputElement).value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onDone?.(); (e.target as HTMLInputElement).blur(); } }}
+        onBlur={() => onDone?.()}
+      />
+    </label>
   );
-}
-
-export function FieldRow({ label, children }: { label: string; children: ComponentChildren }) {
-  return <div class="frow"><span class="pick-label">{label}</span>{children}</div>;
 }
 
 /** Now / so long ago / yesterday, or an exact date and time. null = now. */
 export function WhenRow({ label = 'When', value, onChange }: { label?: string; value: number | null; onChange: (t: number | null) => void }) {
   const [base] = useState(() => Date.now());
-  const is = (h: number) => (h === 0 ? value == null : value != null && Math.abs(base - h * HOUR - value) < 60_000);
-  const custom = value != null && !AGO.some((h) => h && is(h));
+  const [picking, setPicking] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+  const preset = value == null ? 0 : AGO.find((h) => h && Math.abs(base - h * HOUR - value) < 60_000);
+  const display = value == null ? 'Now' : preset === 24 ? `Yesterday, ${fmtTime(value)}` : preset != null ? agoLabel(preset) : `${fmtDayRelative(value)}, ${fmtTime(value)}`;
+  const items: MenuItem[] = [...AGO.map((h) => ({ v: String(h), label: agoLabel(h) })), { v: 'pick', label: 'Choose date & time…', action: true }];
+  useEffect(() => {
+    if (!picking) return;
+    input.current?.focus();
+    try { input.current?.showPicker?.(); } catch { /* not allowed without a direct tap on some browsers */ }
+  }, [picking]);
   return (
-    <FieldRow label={label}>
-      <div class="kinds">
-        {AGO.map((h) => (
-          <button key={h} class={'kind' + (is(h) ? ' on' : '')} aria-pressed={is(h)} onClick={() => onChange(h ? base - h * HOUR : null)}>
-            {h === 0 ? 'Now' : h === 24 ? 'Yesterday' : h < 1 ? '30 min ago' : `${h} h ago`}
-          </button>
-        ))}
-        <input
-          type="datetime-local" class={'kind dt' + (custom ? ' on' : '')} aria-label={`${label}: exact time`}
-          value={toLocalInput(value ?? base)} max={toLocalInput(Date.now() + 60_000)}
-          onChange={(e) => { const v = (e.target as HTMLInputElement).value; if (v) onChange(fromLocalInput(v)); }}
-        />
-      </div>
-    </FieldRow>
+    <>
+      <MenuRow
+        label={label} display={display} items={items} value={preset != null ? [String(preset)] : []}
+        onChange={([v]) => { setPicking(false); onChange(v === '0' ? null : base - Number(v) * HOUR); }}
+        onAction={() => setPicking(true)}
+      />
+      {(picking || (value != null && preset == null)) && (
+        <label class="trow">
+          <span class="mrow-label">Date & time</span>
+          <input
+            ref={input} type="datetime-local" class="trow-input" value={toLocalInput(value ?? base)} max={toLocalInput(Date.now() + 60_000)}
+            onChange={(e) => { const v = (e.target as HTMLInputElement).value; if (v) onChange(fromLocalInput(v)); }}
+          />
+        </label>
+      )}
+    </>
   );
 }
 
-/** Card frame: coloured icon, title, optional "Change", remove. */
-export function CardShell({ kind, title, onChange, onRemove, children }: { kind: CardKind; title?: string; onChange?: () => void; onRemove?: () => void; children: ComponentChildren }) {
+export function MinutesRow({ label, value, options = FOR, unit = 'min', onChange }: { label: string; value: number | undefined; options?: number[]; unit?: 'min' | 's'; onChange: (v: number | undefined) => void }) {
+  const fmt = (n: number) => (unit === 's' ? `${n} s` : fmtMinutes(n));
+  return (
+    <MenuRow
+      label={label} display={value ? fmt(value) : undefined}
+      items={[{ v: '', label: 'Not set' }, ...options.map((m) => ({ v: String(m), label: fmt(m) }))]}
+      value={[value ? String(value) : '']} onChange={([v]) => onChange(v ? Number(v) : undefined)}
+    />
+  );
+}
+
+/** Card frame: coloured icon, title, remove. */
+export function CardShell({ kind, title, onRemove, children }: { kind: CardKind; title?: string; onRemove?: () => void; children: ComponentChildren }) {
   const st = CARD_STYLE[kind];
   return (
     <section class="section log-card">
       <div class="group">
         <div class="card-top">
           <span class="row-icon small" style={{ background: st.color }}><st.Icon /></span>
-          <span class="card-title">{title ?? st.label}</span>
-          {onChange && <button class="link small" onClick={onChange}>Change</button>}
+          <span class="card-title">{title || st.label}</span>
           <span class="grow" />
-          {onRemove && <button class="x-btn" aria-label={`Remove ${title ?? st.label}`} onClick={onRemove}><IconClose /></button>}
+          {onRemove && <button class="x-btn" aria-label={`Remove ${title || st.label}`} onClick={onRemove}><IconClose /></button>}
         </div>
         {children}
       </div>
@@ -117,84 +142,64 @@ export function CardShell({ kind, title, onChange, onRemove, children }: { kind:
 
 export function OtherCardView({ card, onChange, onRemove }: { card: OtherCard; onChange: (c: OtherCard) => void; onRemove: () => void }) {
   const s = settings.value;
-  const [picking, setPicking] = useState(false);
+  const [typing, setTyping] = useState(false);
   const [text, setText] = useState('');
   const set = (p: Partial<OtherCard>) => onChange({ ...card, ...p } as OtherCard);
-  const ready = cardReady(card) && !picking;
-  const choose = (p: Partial<OtherCard>) => { set(p); setPicking(false); setText(''); navigator.vibrate?.(8); };
 
-  if (card.kind === 'posture') {
-    const title = card.posture ? POSTURES[card.posture]?.label ?? card.posture : undefined;
+  if (card.kind === 'move') {
+    const items: MenuItem[] = [
+      ...s.postures.map((p) => ({ v: `p:${p}`, label: POSTURES[p]?.label ?? p, section: 'Posture' })),
+      ...s.exercises.map((x) => ({ v: `x:${x}`, label: x, section: 'Exercise' })),
+      { v: 'new', label: 'Other exercise…', action: true, section: 'Exercise' },
+    ];
+    const commit = () => {
+      const v = text.trim();
+      if (v) { rememberChip('exercises', v); set({ pick: `x:${v}` }); }
+      setTyping(false);
+      setText('');
+    };
+    const exercise = card.pick?.startsWith('x:');
     return (
-      <CardShell kind="posture" title={ready ? title : undefined} onChange={ready ? () => setPicking(true) : undefined} onRemove={onRemove}>
-        {!ready ? (
-          <div class="pad-box">
-            <div class="mini-tiles">
-              {s.postures.map((p) => {
-                const Art = POSTURE_ART[p] ?? ActivityFallback;
-                return <button key={p} class={'mini-tile' + (card.posture === p ? ' on' : '')} onClick={() => choose({ posture: p })}><Art />{POSTURES[p]?.label ?? p}</button>;
-              })}
-            </div>
-          </div>
-        ) : (
+      <CardShell kind="move" onRemove={onRemove}>
+        <MenuRow
+          label="What" placeholder="Choose" display={card.pick ? moveLabel(card.pick) : undefined} autoOpen={card.fresh && !card.pick}
+          items={items} value={card.pick ? [card.pick] : []} onChange={([pick]) => set({ pick })} onAction={() => setTyping(true)}
+        />
+        {typing && <TextRow label="Exercise" value={text} onInput={setText} onDone={commit} autoFocus />}
+        {card.pick && (
           <>
             <WhenRow value={card.when} onChange={(when) => set({ when })} />
-            <FieldRow label="For">
-              <Pick options={HELD.map((m) => ({ v: m, label: fmtMinutes(m) }))} value={card.minutes} onChange={(minutes) => set({ minutes })} />
-            </FieldRow>
+            <MinutesRow label="For" value={card.minutes} onChange={(minutes) => set({ minutes })} />
+            {exercise && hasHolds(card.pick.slice(2)) && (
+              <MinutesRow label="Each hold" unit="s" options={HOLDS} value={card.hold} onChange={(hold) => set({ hold })} />
+            )}
           </>
         )}
       </CardShell>
     );
   }
 
-  const isMed = card.kind === 'med';
-  const names = isMed ? s.treatments.filter((t) => t.kind === 'medication').map((t) => t.name) : s.exercises;
-  const add = (e: Event) => {
-    e.preventDefault();
+  const meds = s.treatments.filter((t) => t.kind === 'medication');
+  const commit = () => {
     const v = text.trim();
-    if (!v) return;
-    if (!isMed) rememberChip('exercises', v);
-    const saved = isMed ? s.treatments.find((t) => t.name.toLowerCase() === v.toLowerCase()) : undefined;
-    choose(isMed ? { name: v, dose: saved?.dose ?? card.dose } : { name: v });
+    if (v) set({ name: v, dose: meds.find((t) => t.name.toLowerCase() === v.toLowerCase())?.dose ?? card.dose });
+    setTyping(false);
+    setText('');
   };
   return (
-    <CardShell kind={card.kind} title={ready ? card.name : undefined} onChange={ready ? () => setPicking(true) : undefined} onRemove={onRemove}>
-      {!ready ? (
-        <div class="pad-box stack">
-          {names.length > 0 && (
-            <div class="chips">
-              {names.map((n) => (
-                <button
-                  key={n} class={'chip' + (card.name === n ? ' on' : '')}
-                  onClick={() => choose(isMed ? { name: n, dose: s.treatments.find((t) => t.name === n)?.dose ?? '' } : { name: n })}
-                >{n}</button>
-              ))}
-            </div>
-          )}
-          <form class="row" onSubmit={add}>
-            <input class="input grow" placeholder={isMed ? 'Medication' : 'Other exercise'} value={text} autocomplete="off" onInput={(e) => setText((e.target as HTMLInputElement).value)} />
-            <button class="btn sm" type="submit" disabled={!text.trim()}>Add</button>
-          </form>
-        </div>
-      ) : card.kind === 'med' ? (
+    <CardShell kind="med" onRemove={onRemove}>
+      <MenuRow
+        label="Medication" placeholder="Choose" display={card.name} autoOpen={card.fresh && !card.name && meds.length > 0}
+        items={[...meds.map((t) => ({ v: t.name, label: t.dose ? `${t.name} · ${t.dose}` : t.name })), { v: 'new', label: 'New medication…', action: true }]}
+        value={card.name ? [card.name] : []}
+        onChange={([name]) => set({ name, dose: meds.find((t) => t.name === name)?.dose ?? '' })}
+        onAction={() => setTyping(true)}
+      />
+      {(typing || (!meds.length && !card.name)) && <TextRow label="Name" value={text} onInput={setText} onDone={commit} autoFocus={typing} />}
+      {card.name && (
         <>
-          <FieldRow label="Dose">
-            <input class="input dose" value={card.dose} onInput={(e) => set({ dose: (e.target as HTMLInputElement).value })} />
-          </FieldRow>
+          <TextRow label="Dose" value={card.dose} onInput={(dose) => set({ dose })} />
           <WhenRow label="Taken" value={card.when} onChange={(when) => set({ when })} />
-        </>
-      ) : (
-        <>
-          <WhenRow value={card.when} onChange={(when) => set({ when })} />
-          <FieldRow label="For">
-            <Pick options={DONE_FOR.map((m) => ({ v: m, label: fmtMinutes(m) }))} value={card.minutes} onChange={(minutes) => set({ minutes })} />
-          </FieldRow>
-          {hasHolds(card.name!) && (
-            <FieldRow label="Hold">
-              <Pick options={HOLDS.map((x) => ({ v: x, label: `${x} s` }))} value={card.hold} onChange={(hold) => set({ hold })} />
-            </FieldRow>
-          )}
         </>
       )}
     </CardShell>

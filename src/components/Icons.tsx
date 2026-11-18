@@ -150,3 +150,6 @@ export const IconUpChev = () => <I><path d="M6 15l6-6 6 6" /></I>;
 export const IconDownChev = () => <I><path d="M6 9l6 6 6-6" /></I>;
 export const IconZoomIn = () => <I><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5M11 8.5v5M8.5 11h5" /></I>;
 export const IconZoomOut = () => <I><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5M8.5 11h5" /></I>;
+export const IconUpDown = () => <I><path d="M8 9l4-4 4 4M8 15l4 4 4-4" /></I>;
+export const IconSymptom = () => <I><circle cx="12" cy="12" r="8.5" /><path d="M12.5 6.5l-3 5h4l-3 5.5" /></I>;
+export const IconBody = () => <I><circle cx="12" cy="5" r="2.5" /><path d="M12 8v7M7 10.5l5-2 5 2M9 21l3-6 3 6" /></I>;

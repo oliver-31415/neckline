@@ -37,7 +37,9 @@ export function entrySummary(e: Entry): { title: string; detail: string } {
       if (e.activities.length) parts.push(e.activities.join(', ').toLowerCase());
       if (e.note) parts.push(`“${e.note}”`);
       const trend = e.trend === 'worse' ? 'Got worse' : e.trend === 'better' ? 'Eased' : e.trend === 'new' ? 'New spot' : e.trend === 'same' ? 'About the same' : 'Pain change';
-      const title = e.mode === 'change' ? trend : e.intensity != null ? `Check-in · ${painWord(e.intensity)}` : e.symptoms.length && !Object.keys(e.regions).length ? 'Symptoms' : 'Check-in';
+      const symptomOnly = e.symptoms.length > 0 && !Object.keys(e.regions).length;
+      if (symptomOnly) parts.splice(parts.indexOf(symptomText(e).toLowerCase()), 1);
+      const title = e.mode === 'change' ? trend : symptomOnly ? symptomText(e) : e.intensity != null ? `Pain · ${painWord(e.intensity)}` : 'Pain';
       return { title, detail: parts.join(' · ') };
     }
     case 'posture':

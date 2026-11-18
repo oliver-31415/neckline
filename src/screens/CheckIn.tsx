@@ -1,18 +1,19 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { entries, removeEntry, rememberChip, saveEntry, settings, uid } from '../lib/store';
 import { closeSheet, go, openSheet, pendingSlot } from '../lib/nav';
-import { AREA_KINDS, DURATIONS, IMPACTS, MAIN_SYMPTOMS } from '../lib/catalog';
+import { AREA_KINDS, DURATIONS, IMPACTS } from '../lib/catalog';
 import { ago, fmtSlot } from '../lib/time';
 import { slotStatus } from '../lib/env';
-import type { Level, PainEntry, Sensation } from '../lib/types';
+import type { PainEntry, Sensation } from '../lib/types';
 import { BodyMap, SPINE, regionLabel, spineRangeLabel } from '../components/BodyMap';
 import { PainPill, PainSlider, Sheet, showToast } from '../components/ui';
-import { IconClose, IconDownChev, IconGear, IconPlus, IconUpChev } from '../components/Icons';
-import { CARD_STYLE, CardShell, FieldRow, OtherCardView, Pick, WhenRow, cardEntry, cardReady, type CardKind, type OtherCard } from '../forms/LogCards';
+import { IconClose, IconDownChev, IconGear, IconPlus, IconUpChev, IconUpDown } from '../components/Icons';
+import { MenuButton, MenuRow } from '../components/Menu';
+import { CARD_STYLE, CardShell, OtherCardView, TextRow, WhenRow, cardEntry, cardReady, type CardKind, type OtherCard } from '../forms/LogCards';
 
-/** A symptom being logged. `when` null = now; `links` are spine ranges sharing one score (not saved). */
+/** A pain or symptom being logged. `when` null = now; `links` are spine ranges sharing one score (not saved). */
 type Draft = PainEntry & { levels: Record<string, number>; kinds: Record<string, Sensation[]>; when: number | null; links: string[][] };
-type Card = { key: string; kind: 'symptom'; d: Draft } | OtherCard;
+type Card = { key: string; kind: 'pain' | 'symptom'; fresh?: boolean; d: Draft } | OtherCard;
 
 const blank = (): Draft => ({
   id: uid(), type: 'pain', mode: 'checkin', time: Date.now(), createdAt: 0, updatedAt: 0,
@@ -22,33 +23,16 @@ const blank = (): Draft => ({
 
 function newCard(kind: CardKind): Card {
   const key = uid();
-  if (kind === 'symptom') return { key, kind, d: blank() };
-  if (kind === 'med') return { key, kind, dose: '', when: null };
-  return { key, kind, when: null } as OtherCard;
+  if (kind === 'pain' || kind === 'symptom') return { key, kind, fresh: true, d: blank() };
+  if (kind === 'med') return { key, kind, fresh: true, dose: '', when: null };
+  return { key, kind, fresh: true, when: null };
 }
-
-const painTouched = (d: Draft) =>
-  Object.keys(d.regions).length > 0 || d.symptoms.length > 0 || !!d.note || !!d.duration || Object.values(d.impacts).some((v) => v);
 
 /** Draft → saved entry. Overall pain is the worst marked area; older entries without area levels keep their own. */
 function toEntry(d: Draft, now: number, extra: Partial<PainEntry> = {}): PainEntry {
   const { when, links: _links, ...rest } = d;
   const lv = Object.values(d.levels);
   return { ...rest, intensity: lv.length ? Math.max(...lv) : d.intensity ?? null, time: when ?? now, ...extra };
-}
-
-/** Multi-select: what this area feels like. */
-function KindChips({ value, onChange }: { value: Sensation[]; onChange: (v: Sensation[]) => void }) {
-  return (
-    <div class="kinds">
-      {AREA_KINDS.map((k) => {
-        const on = value.includes(k.id);
-        return (
-          <button key={k.id} class={'kind' + (on ? ' on' : '')} aria-pressed={on} aria-label={k.label} onClick={() => onChange(on ? value.filter((x) => x !== k.id) : [...value, k.id])}>{k.short}</button>
-        );
-      })}
-    </div>
-  );
 }
 
 const spineIdx = (id: string) => SPINE.indexOf(id.slice(6));
@@ -81,53 +65,22 @@ function initialLinks(d: Draft) {
   return out.filter((g) => g.length > 1);
 }
 
-/** Headache and migraine as chips (with a strength once chosen); every other symptom comes from a dropdown or is typed in. */
-function SymptomPicker({ options, value, onChange }: { options: string[]; value: string[]; onChange: (v: string[]) => void }) {
-  const [typing, setTyping] = useState(false);
-  const [text, setText] = useState('');
-  const shown = [...MAIN_SYMPTOMS, ...value.filter((v) => !MAIN_SYMPTOMS.includes(v))];
-  const rest = options.filter((o) => !shown.includes(o));
-  const toggle = (o: string) => onChange(value.includes(o) ? value.filter((x) => x !== o) : [...value, o]);
-  function commit() {
-    const t = text.trim();
-    if (t) { rememberChip('symptoms', t); if (!value.includes(t)) onChange([...value, t]); }
-    setText('');
-    setTyping(false);
-  }
+/** What an area feels like, chosen from a menu (any number). */
+function FeelsLike({ value, onChange }: { value: Sensation[]; onChange: (v: Sensation[]) => void }) {
+  const text = AREA_KINDS.filter((k) => value.includes(k.id)).map((k) => k.short).join(', ');
   return (
-    <div class="chips">
-      {shown.map((o) => (
-        <button key={o} class={'chip' + (value.includes(o) ? ' on' : '')} aria-pressed={value.includes(o)} onClick={() => toggle(o)}>{o}</button>
-      ))}
-      {typing ? (
-        <input class="input chip-input" autoFocus value={text} placeholder="Symptom" onInput={(e) => setText((e.target as HTMLInputElement).value)} onKeyDown={(e) => e.key === 'Enter' && commit()} onBlur={commit} />
-      ) : (
-        <label class="chip add select-chip">
-          <IconPlus /> Other
-          <select
-            aria-label="Other symptom" value=""
-            onChange={(e) => {
-              const el = e.target as HTMLSelectElement;
-              const v = el.value;
-              el.value = '';
-              if (v === '__new') setTyping(true);
-              else if (v) onChange([...value, v]);
-            }}
-          >
-            <option value="" disabled>Other symptom</option>
-            {rest.map((o) => <option key={o} value={o}>{o}</option>)}
-            <option value="__new">New…</option>
-          </select>
-        </label>
-      )}
-    </div>
+    <MenuButton
+      class={'feels' + (text ? ' set' : '')} label="Feels like" multi
+      items={AREA_KINDS.map((k) => ({ v: k.id, label: k.label }))} value={value} onChange={(v) => onChange(v as Sensation[])}
+    >
+      <span>{text || 'Feels like…'}</span><IconUpDown />
+    </MenuButton>
   );
 }
 
-/** Where it hurts, symptoms, when, how long, what it affected. Shared by the home card and the edit sheet. */
-function SymptomEditor({ d, onChange }: { d: Draft; onChange: (d: Draft) => void }) {
+/** The diagram and one row per marked area. */
+function AreaEditor({ d, set }: { d: Draft; set: (p: Partial<Draft>) => void }) {
   const s = settings.value;
-  const set = (p: Partial<Draft>) => onChange({ ...d, ...p });
   const regionIds = Object.keys(d.regions);
   const groups = groupsOf(d.links, d.regions);
   const groupOf = new Map(groups.flatMap((g) => g.map((id) => [id, g] as const)));
@@ -185,18 +138,11 @@ function SymptomEditor({ d, onChange }: { d: Draft; onChange: (d: Draft) => void
     set({ regions, levels, kinds, links: d.links.map((g) => g.filter((x) => !ids.includes(x))) });
   }
 
-  function setSymptoms(symptoms: string[]) {
-    const symptomLevels = Object.fromEntries(Object.entries(d.symptomLevels ?? {}).filter(([k]) => symptoms.includes(k)));
-    set({ symptoms, symptomLevels });
-  }
-
   return (
     <>
-      {s.steps.where && (
-        <div class="pad-box tight">
-          <BodyMap value={d.regions} levels={d.levels} onTap={tapRegion} onRange={addRange} incision={s.incision} />
-        </div>
-      )}
+      <div class="pad-box tight">
+        <BodyMap value={d.regions} levels={d.levels} onTap={tapRegion} onRange={addRange} incision={s.incision} />
+      </div>
       {regionIds.filter((id) => (groupOf.get(id)?.[0] ?? id) === id).map((id) => {
         const g = groupOf.get(id);
         const label = g ? spineRangeLabel(spineIdx(g[0]), spineIdx(g[g.length - 1])) : regionLabel(id);
@@ -209,25 +155,48 @@ function SymptomEditor({ d, onChange }: { d: Draft; onChange: (d: Draft) => void
                 </button>
               ) : <span class="arow-label">{label}</span>}
               <PainSlider value={d.levels[id]} onChange={(level) => setArea(id, { level })} label={label} />
+              <PainPill n={d.levels[id] ?? null} />
+              <button class="x-btn" aria-label={`Remove ${label}`} onClick={() => removeArea(id)}><IconClose /></button>
+            </div>
+            <div class="arow-line">
+              <FeelsLike value={d.kinds[id] ?? []} onChange={(kinds) => setArea(id, { kinds })} />
               {id.startsWith('spine-') && (
                 <span class="spine-step">
                   <button class="x-btn" aria-label="One vertebra higher" onClick={() => moveSpine(g ?? [id], -1)}><IconUpChev /></button>
                   <button class="x-btn" aria-label="One vertebra lower" onClick={() => moveSpine(g ?? [id], 1)}><IconDownChev /></button>
                 </span>
               )}
-              <PainPill n={d.levels[id] ?? null} />
-              <button class="x-btn" aria-label={`Remove ${label}`} onClick={() => removeArea(id)}><IconClose /></button>
             </div>
-            <KindChips value={d.kinds[id] ?? []} onChange={(kinds) => setArea(id, { kinds })} />
           </div>
         );
       })}
-      {s.steps.symptoms && (
-        <div class="pad-box">
-          <SymptomPicker options={s.symptoms} value={d.symptoms} onChange={setSymptoms} />
-        </div>
-      )}
-      {MAIN_SYMPTOMS.filter((x) => d.symptoms.includes(x)).map((x) => (
+    </>
+  );
+}
+
+/** Symptoms from a menu (or typed in), each with its own strength. */
+function SymptomRows({ d, set, autoOpen }: { d: Draft; set: (p: Partial<Draft>) => void; autoOpen?: boolean }) {
+  const s = settings.value;
+  const [typing, setTyping] = useState(false);
+  const [text, setText] = useState('');
+  const options = [...s.symptoms, ...d.symptoms.filter((x) => !s.symptoms.includes(x))];
+  const choose = (symptoms: string[]) =>
+    set({ symptoms, symptomLevels: Object.fromEntries(Object.entries(d.symptomLevels ?? {}).filter(([k]) => symptoms.includes(k))) });
+  const commit = () => {
+    const v = text.trim();
+    if (v) { rememberChip('symptoms', v); if (!d.symptoms.includes(v)) choose([...d.symptoms, v]); }
+    setTyping(false);
+    setText('');
+  };
+  return (
+    <>
+      <MenuRow
+        label="Symptoms" placeholder="Choose" multi autoOpen={autoOpen} display={d.symptoms.join(', ')}
+        items={[...options.map((x) => ({ v: x, label: x })), { v: 'new', label: 'Something else…', action: true }]}
+        value={d.symptoms} onChange={choose} onAction={() => setTyping(true)}
+      />
+      {typing && <TextRow label="Symptom" value={text} onInput={setText} onDone={commit} autoFocus />}
+      {d.symptoms.map((x) => (
         <div class="arow" key={x}>
           <div class="arow-line">
             <span class="arow-label">{x}</span>
@@ -236,32 +205,32 @@ function SymptomEditor({ d, onChange }: { d: Draft; onChange: (d: Draft) => void
           </div>
         </div>
       ))}
+    </>
+  );
+}
+
+/** When, how long, what it affected, and a note. */
+function DetailRows({ d, set }: { d: Draft; set: (p: Partial<Draft>) => void }) {
+  const s = settings.value;
+  const affected = IMPACTS.filter((i) => d.impacts[i.id]);
+  return (
+    <>
       <WhenRow value={d.when} onChange={(when) => set({ when })} />
       {s.steps.duration && (
-        <FieldRow label="Lasted">
-          <Pick options={[...DURATIONS, ...(d.duration && !DURATIONS.includes(d.duration) ? [d.duration] : [])].map((v) => ({ v, label: v }))} value={d.duration} onChange={(v) => set({ duration: v ?? null })} />
-        </FieldRow>
+        <MenuRow
+          label="Lasted" display={d.duration ?? undefined}
+          items={[{ v: '', label: 'Not set' }, ...[...DURATIONS, ...(d.duration && !DURATIONS.includes(d.duration) ? [d.duration] : [])].map((v) => ({ v, label: v }))]}
+          value={[d.duration ?? '']} onChange={([v]) => set({ duration: v || null })}
+        />
       )}
       {s.steps.impact && (
-        <FieldRow label="Affected">
-          <div class="kinds">
-            {IMPACTS.map((im) => {
-              const v = d.impacts[im.id] ?? 0;
-              const next = ((v + 1) % 3) as Level;
-              return (
-                <button key={im.id} class={'kind' + (v ? ' on' : '')} aria-pressed={!!v} onClick={() => set({ impacts: { ...d.impacts, [im.id]: next || null } })}>
-                  {im.label}{v === 1 ? ' · some' : v === 2 ? ' · a lot' : ''}
-                </button>
-              );
-            })}
-          </div>
-        </FieldRow>
+        <MenuRow
+          label="Got in the way of" multi display={affected.map((i) => i.label).join(', ')} placeholder="Nothing"
+          items={IMPACTS.map((i) => ({ v: i.id, label: i.label }))} value={affected.map((i) => i.id)}
+          onChange={(ids) => set({ impacts: Object.fromEntries(ids.map((id) => [id, d.impacts[id] || 1])) })}
+        />
       )}
-      {s.steps.note && (
-        <FieldRow label="Note">
-          <input class="input note-input" value={d.note} onInput={(e) => set({ note: (e.target as HTMLInputElement).value })} />
-        </FieldRow>
-      )}
+      {s.steps.note && <TextRow label="Note" placeholder="Add" value={d.note ?? ''} onInput={(note) => set({ note })} />}
     </>
   );
 }
@@ -278,21 +247,30 @@ const fromEntry = (entry: PainEntry): Draft => {
   return { ...d, links: initialLinks(d) };
 };
 
-/** Home: pick a symptom, posture, medication or exercise; stack as many as you like; save them together. */
+/** Home: log pain, a symptom, a medication or a posture/exercise; stack as many as you like; save them together. */
 export function CheckIn({ entry }: { entry?: PainEntry }) {
-  return entry ? <EditSymptom entry={entry} /> : <Home />;
+  return entry ? <EditEntry entry={entry} /> : <Home />;
 }
 
-function EditSymptom({ entry }: { entry: PainEntry }) {
+/** Editing a saved pain or symptom entry from History. */
+function EditEntry({ entry }: { entry: PainEntry }) {
   const [d, setD] = useState(() => fromEntry(entry));
+  const set = (p: Partial<Draft>) => setD({ ...d, ...p });
+  const hasPain = Object.keys(entry.regions).length > 0 || !entry.symptoms.length;
   async function save() {
     await saveEntry(toEntry(d, Date.now()));
     closeSheet();
     showToast('Saved');
   }
   return (
-    <Sheet title="Symptom" onClose={closeSheet} action={{ label: 'Save', onClick: save }} tall>
-      <section class="section"><div class="group"><SymptomEditor d={d} onChange={setD} /></div></section>
+    <Sheet title={hasPain ? 'Pain' : 'Symptom'} onClose={closeSheet} action={{ label: 'Save', onClick: save }} tall>
+      <section class="section">
+        <div class="group">
+          {hasPain && <AreaEditor d={d} set={set} />}
+          {(!hasPain || entry.symptoms.length > 0) && <SymptomRows d={d} set={set} />}
+          <DetailRows d={d} set={set} />
+        </div>
+      </section>
       <section class="section">
         <div class="group">
           <button class="row-item danger" onClick={async () => { if (confirm('Delete this entry?')) { await removeEntry(d.id); closeSheet(); showToast('Deleted'); } }}>
@@ -304,16 +282,28 @@ function EditSymptom({ entry }: { entry: PainEntry }) {
   );
 }
 
-const KINDS: CardKind[] = ['symptom', 'posture', 'med', 'exercise'];
+const KINDS: CardKind[] = ['pain', 'symptom', 'med', 'move'];
+
+/** How each "add" row reads, given what's already on the screen. null hides it. */
+function addPhrase(k: CardKind, cards: Card[]): string | null {
+  const has = (x: CardKind) => cards.some((c) => c.kind === x);
+  const issue = has('pain') || has('symptom');
+  switch (k) {
+    case 'pain': return has('pain') ? null : 'I’m in pain too';
+    case 'symptom': return has('symptom') ? 'I had another symptom' : has('pain') ? 'I also had a headache or other symptom' : 'I had a symptom';
+    case 'med': return has('med') ? 'I took another medication' : issue ? 'I took medication for it' : 'I took medication';
+    case 'move': return has('move') ? 'I was doing something else too' : issue ? 'What I was doing before it' : 'What I was doing';
+  }
+}
 
 function Home() {
   const s = settings.value;
-  const [cards, setCards] = useState<Card[]>(() => (pendingSlot.value ? [newCard('symptom')] : []));
+  const [cards, setCards] = useState<Card[]>(() => (pendingSlot.value ? [newCard('pain')] : []));
   const added = useRef<string | null>(null);
 
-  // A reminder opened the app: start with a symptom card.
+  // A reminder opened the app: start with the pain card.
   useEffect(() => {
-    if (pendingSlot.value && !cards.some((c) => c.kind === 'symptom')) setCards((cs) => [newCard('symptom'), ...cs]);
+    if (pendingSlot.value && !cards.some((c) => c.kind === 'pain')) setCards((cs) => [newCard('pain'), ...cs]);
   }, [pendingSlot.value]);
 
   // Bring a newly added card into view.
@@ -331,7 +321,9 @@ function Home() {
   };
   const update = (key: string, c: Card) => setCards((cs) => cs.map((x) => (x.key === key ? c : x)));
   const remove = (key: string) => setCards((cs) => cs.filter((x) => x.key !== key));
-  const ready = cards.filter((c) => (c.kind === 'symptom' ? painTouched(c.d) : cardReady(c)));
+  const isReady = (c: Card) =>
+    !('d' in c) ? cardReady(c) : c.kind === 'pain' ? Object.keys(c.d.regions).length > 0 : c.d.symptoms.length > 0;
+  const ready = cards.filter(isReady);
 
   async function save() {
     const now = Date.now();
@@ -340,8 +332,8 @@ function Home() {
     const due = pendingSlot.value ?? s.checkinTimes.find((t) => slotStatus(t, pains) === 'due') ?? null;
     const ids: string[] = [];
     for (const c of ready) {
-      const e = c.kind === 'symptom'
-        ? toEntry(c.d, now, { group, slot: c.d.when == null ? due : null })
+      const e = 'd' in c
+        ? toEntry(c.d, now, { group, slot: c.kind === 'pain' && c.d.when == null ? due : null })
         : cardEntry(c, now, group);
       ids.push((await saveEntry(e)).id);
     }
@@ -351,6 +343,8 @@ function Home() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     showToast('Saved', { label: 'Undo', run: () => ids.forEach((id) => removeEntry(id)) });
   }
+
+  const phrases = KINDS.map((k) => [k, addPhrase(k, cards)] as const).filter((x): x is [CardKind, string] => !!x[1]);
 
   return (
     <div class={'screen' + (cards.length ? ' has-savebar' : '')}>
@@ -363,19 +357,25 @@ function Home() {
       </header>
 
       {cards.length === 0 ? (
-        <div class="log-pick">
-          {KINDS.map((k) => {
-            const st = CARD_STYLE[k];
-            return <button key={k} onClick={() => add(k)}><span style={{ background: st.color }}><st.Icon /></span>{st.label}</button>;
-          })}
-        </div>
+        <>
+          <p class="log-prompt">What would you like to log?</p>
+          <div class="log-pick">
+            {KINDS.map((k) => {
+              const st = CARD_STYLE[k];
+              return <button key={k} onClick={() => add(k)}><span style={{ background: st.color }}><st.Icon /></span>{st.label}</button>;
+            })}
+          </div>
+        </>
       ) : (
         <>
           {cards.map((c) => (
             <div id={'card-' + c.key} key={c.key}>
-              {c.kind === 'symptom' ? (
-                <CardShell kind="symptom" onRemove={() => remove(c.key)}>
-                  <SymptomEditor d={c.d} onChange={(d) => update(c.key, { ...c, d })} />
+              {'d' in c ? (
+                <CardShell kind={c.kind} onRemove={() => remove(c.key)}>
+                  {c.kind === 'pain'
+                    ? <AreaEditor d={c.d} set={(p) => update(c.key, { ...c, d: { ...c.d, ...p } })} />
+                    : <SymptomRows d={c.d} set={(p) => update(c.key, { ...c, d: { ...c.d, ...p } })} autoOpen={c.fresh} />}
+                  <DetailRows d={c.d} set={(p) => update(c.key, { ...c, d: { ...c.d, ...p } })} />
                 </CardShell>
               ) : (
                 <OtherCardView card={c} onChange={(n) => update(c.key, n)} onRemove={() => remove(c.key)} />
@@ -383,11 +383,16 @@ function Home() {
             </div>
           ))}
           <section class="section">
-            <div class="sec-head"><span>Add</span></div>
-            <div class="add-row">
-              {KINDS.map((k) => {
+            <div class="group">
+              {phrases.map(([k, text]) => {
                 const st = CARD_STYLE[k];
-                return <button key={k} onClick={() => add(k)}><span style={{ background: st.color }}><st.Icon /></span>{st.label}</button>;
+                return (
+                  <button key={k} class="row-item add-item" onClick={() => add(k)}>
+                    <span class="row-icon small" style={{ background: st.color }}><st.Icon /></span>
+                    <span class="row-label">{text}</span>
+                    <span class="add-plus"><IconPlus /></span>
+                  </button>
+                );
               })}
             </div>
           </section>
