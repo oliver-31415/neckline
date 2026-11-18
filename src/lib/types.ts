@@ -11,6 +11,7 @@ interface Base {
   createdAt: number;
   updatedAt: number;
   note?: string;
+  group?: string; // entries saved together from one log
 }
 
 export interface PainEntry extends Base {
@@ -25,6 +26,7 @@ export interface PainEntry extends Base {
   duration?: string | null;
   impacts: Record<string, Level | null>;
   symptoms: string[];
+  symptomLevels?: Record<string, number>; // 0-10 strength, for headache and migraine
   postures: string[]; // what I was mostly doing, reported alongside
   activities: string[];
   slot?: string | null; // "09:00" when answering a scheduled check-in

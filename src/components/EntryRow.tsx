@@ -7,7 +7,7 @@ import { getPhoto } from '../lib/db';
 import { regionNames } from './BodyMap';
 import { entryKindLabels } from '../lib/analysis';
 import { PainPill } from './ui';
-import { IconActivity, IconMeal, IconMoon, IconPill, IconPosture } from './Icons';
+import { IconActivity, IconExercise, IconMeal, IconMoon, IconPill, IconPosture } from './Icons';
 
 export const TYPE_STYLE: Record<string, { color: string; Icon: () => preact.JSX.Element; label: string }> = {
   posture: { color: 'var(--posture)', Icon: IconPosture, label: 'Posture' },
@@ -17,6 +17,13 @@ export const TYPE_STYLE: Record<string, { color: string; Icon: () => preact.JSX.
   day: { color: 'var(--ink-2)', Icon: IconMoon, label: 'Sleep & day' },
 };
 
+/** "Headache 6, migraine, dizziness" */
+export function symptomText(e: { symptoms: string[]; symptomLevels?: Record<string, number> }) {
+  return e.symptoms.map((x) => (e.symptomLevels?.[x] != null ? `${x} ${e.symptomLevels[x]}` : x)).join(', ');
+}
+
+const EXERCISE_STYLE = { color: 'var(--activity)', Icon: IconExercise, label: 'Exercise' };
+
 export function entrySummary(e: Entry): { title: string; detail: string } {
   switch (e.type) {
     case 'pain': {
@@ -25,12 +32,13 @@ export function entrySummary(e: Entry): { title: string; detail: string } {
       if (regions.length) parts.push(regions.length <= 2 ? regions.join(', ') : `${regions[0]} +${regions.length - 1} more`);
       const kinds = entryKindLabels(e);
       if (kinds.length) parts.push(kinds.join(', ').toLowerCase());
-      if (e.symptoms.length) parts.push(e.symptoms.join(', ').toLowerCase());
+      if (e.symptoms.length) parts.push(symptomText(e).toLowerCase());
       if (e.postures.length) parts.push(e.postures.map((p) => POSTURES[p]?.label ?? p).join(', ').toLowerCase());
       if (e.activities.length) parts.push(e.activities.join(', ').toLowerCase());
       if (e.note) parts.push(`“${e.note}”`);
       const trend = e.trend === 'worse' ? 'Got worse' : e.trend === 'better' ? 'Eased' : e.trend === 'new' ? 'New spot' : e.trend === 'same' ? 'About the same' : 'Pain change';
-      return { title: e.mode === 'change' ? trend : `Check-in · ${painWord(e.intensity)}`, detail: parts.join(' · ') };
+      const title = e.mode === 'change' ? trend : e.intensity != null ? `Check-in · ${painWord(e.intensity)}` : e.symptoms.length && !Object.keys(e.regions).length ? 'Symptoms' : 'Check-in';
+      return { title, detail: parts.join(' · ') };
     }
     case 'posture':
       return { title: POSTURES[e.posture]?.label ?? e.posture, detail: [fmtMinutes(e.minutes), e.breaks ? `breaks: ${e.breaks === 'some' ? 'a few' : e.breaks}` : '', e.note].filter(Boolean).join(' · ') };
@@ -60,11 +68,12 @@ function Thumb({ id }: { id: string }) {
 
 export function EntryRow({ e, showDate }: { e: Entry; showDate?: boolean }) {
   const { title, detail } = entrySummary(e);
-  const st = TYPE_STYLE[e.type];
+  const st = e.type === 'treatment' && e.kind === 'exercises' ? EXERCISE_STYLE : TYPE_STYLE[e.type];
+  const strength = e.type === 'pain' ? e.intensity ?? (Object.values(e.symptomLevels ?? {}).length ? Math.max(...Object.values(e.symptomLevels!)) : null) : null;
   return (
     <button class="entry" onClick={() => editEntry(e)}>
       {e.type === 'pain' ? (
-        <span class="entry-icon" style={{ background: 'transparent' }}><PainPill n={e.intensity} /></span>
+        <span class="entry-icon" style={{ background: 'transparent' }}><PainPill n={strength} /></span>
       ) : (
         <span class="entry-icon" style={{ background: `color-mix(in srgb, ${st.color} 15%, transparent)`, color: st.color }}><st.Icon /></span>
       )}

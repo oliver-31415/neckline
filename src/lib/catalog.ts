@@ -60,7 +60,7 @@ export const DEFAULT_SIDE_EFFECTS = ['Drowsy', 'Nausea', 'Upset stomach', 'Dizzy
 
 export const DEFAULT_MEAL_TAGS = ['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Coffee', 'Alcohol'];
 
-export const DURATIONS = ['Moments', 'Minutes', 'Under an hour', 'Hours', 'Constant', 'Not sure'];
+export const DURATIONS = ['5 min', '15 min', '30 min', '1 h', '2 h', '4 h', 'All day', 'Still going'];
 
 export const IMPACTS: { id: string; label: string }[] = [
   { id: 'sleep', label: 'Sleep' },
@@ -90,7 +90,6 @@ export const STEPS: { id: StepId; label: string; hint: string }[] = [
   { id: 'duration', label: 'How long it lasts', hint: '' },
   { id: 'impact', label: 'What it’s affecting', hint: '' },
   { id: 'symptoms', label: 'Symptoms', hint: '' },
-  { id: 'context', label: 'Activities', hint: '' },
   { id: 'note', label: 'Note', hint: '' },
 ];
 

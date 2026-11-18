@@ -1,27 +1,41 @@
-import { useState } from 'preact/hooks';
-import type { ComponentChildren } from 'preact';
-import { entries, rememberChip, removeEntry, saveEntry, settings, uid } from '../lib/store';
+import { useEffect, useRef, useState } from 'preact/hooks';
+import { entries, removeEntry, rememberChip, saveEntry, settings, uid } from '../lib/store';
 import { closeSheet, go, openSheet, pendingSlot } from '../lib/nav';
 import { AREA_KINDS, DURATIONS, IMPACTS, MAIN_SYMPTOMS } from '../lib/catalog';
-import { ago, fmtSlot, fmtTime } from '../lib/time';
+import { ago, fmtSlot } from '../lib/time';
 import { slotStatus } from '../lib/env';
 import type { Level, PainEntry, Sensation } from '../lib/types';
 import { BodyMap, SPINE, regionLabel, spineRangeLabel } from '../components/BodyMap';
-import { Chips, PainPill, PainSlider, Seg, Sheet, WhenPicker, showToast } from '../components/ui';
-import { IconChevron, IconClose, IconDownChev, IconGear, IconPlus, IconUpChev } from '../components/Icons';
-import { ActivityTiles } from '../forms/common';
-import { SinceLast, itemsToEntries, type Item } from '../forms/QuickAdd';
+import { PainPill, PainSlider, Sheet, showToast } from '../components/ui';
+import { IconClose, IconDownChev, IconGear, IconPlus, IconUpChev } from '../components/Icons';
+import { CARD_STYLE, CardShell, FieldRow, OtherCardView, Pick, WhenRow, cardEntry, cardReady, type CardKind, type OtherCard } from '../forms/LogCards';
 
-type Draft = Omit<PainEntry, 'intensity'> & { intensity: number | null | undefined; levels: Record<string, number>; kinds: Record<string, Sensation[]> };
-type Detail = 'time' | 'trend' | 'duration' | 'impact' | 'context' | 'note';
-
-const TRENDS = [{ v: 'better', label: 'Better' }, { v: 'same', label: 'Same' }, { v: 'worse', label: 'Worse' }] as const;
+/** A symptom being logged. `when` null = now; `links` are spine ranges sharing one score (not saved). */
+type Draft = PainEntry & { levels: Record<string, number>; kinds: Record<string, Sensation[]>; when: number | null; links: string[][] };
+type Card = { key: string; kind: 'symptom'; d: Draft } | OtherCard;
 
 const blank = (): Draft => ({
   id: uid(), type: 'pain', mode: 'checkin', time: Date.now(), createdAt: 0, updatedAt: 0,
-  intensity: undefined, trend: null, regions: {}, levels: {}, kinds: {}, qualities: [], duration: null, impacts: {},
-  symptoms: [], postures: [], activities: [], slot: null, note: '',
+  intensity: null, trend: null, regions: {}, levels: {}, kinds: {}, qualities: [], duration: null, impacts: {},
+  symptoms: [], symptomLevels: {}, postures: [], activities: [], slot: null, note: '', when: null, links: [],
 });
+
+function newCard(kind: CardKind): Card {
+  const key = uid();
+  if (kind === 'symptom') return { key, kind, d: blank() };
+  if (kind === 'med') return { key, kind, dose: '', when: null };
+  return { key, kind, when: null } as OtherCard;
+}
+
+const painTouched = (d: Draft) =>
+  Object.keys(d.regions).length > 0 || d.symptoms.length > 0 || !!d.note || !!d.duration || Object.values(d.impacts).some((v) => v);
+
+/** Draft → saved entry. Overall pain is the worst marked area; older entries without area levels keep their own. */
+function toEntry(d: Draft, now: number, extra: Partial<PainEntry> = {}): PainEntry {
+  const { when, links: _links, ...rest } = d;
+  const lv = Object.values(d.levels);
+  return { ...rest, intensity: lv.length ? Math.max(...lv) : d.intensity ?? null, time: when ?? now, ...extra };
+}
 
 /** Multi-select: what this area feels like. */
 function KindChips({ value, onChange }: { value: Sensation[]; onChange: (v: Sensation[]) => void }) {
@@ -67,7 +81,7 @@ function initialLinks(d: Draft) {
   return out.filter((g) => g.length > 1);
 }
 
-/** Headache and migraine as chips; every other symptom is picked from a dropdown or typed in. */
+/** Headache and migraine as chips (with a strength once chosen); every other symptom comes from a dropdown or is typed in. */
 function SymptomPicker({ options, value, onChange }: { options: string[]; value: string[]; onChange: (v: string[]) => void }) {
   const [typing, setTyping] = useState(false);
   const [text, setText] = useState('');
@@ -110,27 +124,14 @@ function SymptomPicker({ options, value, onChange }: { options: string[]; value:
   );
 }
 
-/** Home screen: rate pain, tap where it is, save. Also used (in a sheet) to edit a past check-in. */
-export function CheckIn({ entry }: { entry?: PainEntry }) {
+/** Where it hurts, symptoms, when, how long, what it affected. Shared by the home card and the edit sheet. */
+function SymptomEditor({ d, onChange }: { d: Draft; onChange: (d: Draft) => void }) {
   const s = settings.value;
-  const editing = !!entry;
-  const [d, setD] = useState<Draft>(() => (entry ? {
-    ...entry,
-    levels: entry.levels ?? {},
-    kinds: entry.kinds ?? Object.fromEntries(Object.entries(entry.regions).map(([k, v]) => [k, [v]])),
-  } : blank()));
-  const [timeSet, setTimeSet] = useState(editing);
-  const [open, setOpen] = useState<Detail | null>(null);
-  const [extras, setExtras] = useState<Item[]>([]);
-  const [links, setLinks] = useState<string[][]>(() => initialLinks(d));
-  const set = (p: Partial<Draft>) => setD({ ...d, ...p });
-
+  const set = (p: Partial<Draft>) => onChange({ ...d, ...p });
   const regionIds = Object.keys(d.regions);
-  const painTouched = d.trend != null || regionIds.length > 0 || d.qualities.length + d.symptoms.length + d.postures.length + d.activities.length > 0 || !!d.note || !!d.duration || Object.values(d.impacts).some((v) => v != null);
-  const touched = painTouched || extras.length > 0;
-
-  const groups = groupsOf(links, d.regions);
+  const groups = groupsOf(d.links, d.regions);
   const groupOf = new Map(groups.flatMap((g) => g.map((id) => [id, g] as const)));
+  const copy = () => ({ regions: { ...d.regions }, levels: { ...d.levels }, kinds: { ...d.kinds } });
 
   /** Move marked vertebrae (one, or a linked run) up (-1) or down (+1) the spine, keeping levels and pain types. */
   function moveSpine(ids: string[], dir: -1 | 1) {
@@ -145,17 +146,15 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
       if (d.levels[k] != null) levels[nk] = d.levels[k];
       if (d.kinds[k]) kinds[nk] = d.kinds[k];
     }
-    set({ regions, levels, kinds });
-    setLinks(links.map((g) => (g.some((x) => map.has(x)) ? g.map((x) => map.get(x) ?? x) : g)));
+    set({ regions, levels, kinds, links: d.links.map((g) => (g.some((x) => map.has(x)) ? g.map((x) => map.get(x) ?? x) : g)) });
   }
 
   function tapRegion(id: string) {
-    const regions = { ...d.regions };
-    const levels = { ...d.levels };
-    const kinds = { ...d.kinds };
-    if (regions[id]) { delete regions[id]; delete levels[id]; delete kinds[id]; setLinks(links.map((g) => g.filter((x) => x !== id))); }
+    const { regions, levels, kinds } = copy();
+    let links = d.links;
+    if (regions[id]) { delete regions[id]; delete levels[id]; delete kinds[id]; links = links.map((g) => g.filter((x) => x !== id)); }
     else { regions[id] = 'pain'; levels[id] = 5; kinds[id] = []; }
-    set({ regions, levels, kinds });
+    set({ regions, levels, kinds, links });
     navigator.vibrate?.(8);
   }
 
@@ -164,21 +163,15 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
     const first = ids.find((id) => d.regions[id]);
     const level = first ? d.levels[first] ?? 5 : 5;
     const ks = first ? d.kinds[first] ?? [] : [];
-    const regions = { ...d.regions };
-    const levels = { ...d.levels };
-    const kinds = { ...d.kinds };
+    const { regions, levels, kinds } = copy();
     for (const id of ids) { regions[id] = ks[0] ?? 'pain'; levels[id] = level; kinds[id] = [...ks]; }
-    set({ regions, levels, kinds });
-    setLinks([...links.map((g) => g.filter((x) => !ids.includes(x))), ids]);
+    set({ regions, levels, kinds, links: [...d.links.map((g) => g.filter((x) => !ids.includes(x))), ids] });
   }
 
   /** Apply a change to one area, or to every vertebra in its linked run. */
   function setArea(id: string, patch: { level?: number; kinds?: Sensation[] }) {
-    const ids = groupOf.get(id) ?? [id];
-    const levels = { ...d.levels };
-    const kinds = { ...d.kinds };
-    const regions = { ...d.regions };
-    for (const x of ids) {
+    const { regions, levels, kinds } = copy();
+    for (const x of groupOf.get(id) ?? [id]) {
       if (patch.level != null) levels[x] = patch.level;
       if (patch.kinds) { kinds[x] = [...patch.kinds]; regions[x] = patch.kinds[0] ?? 'pain'; }
     }
@@ -187,153 +180,180 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
 
   function removeArea(id: string) {
     const ids = groupOf.get(id) ?? [id];
-    const regions = { ...d.regions };
-    const levels = { ...d.levels };
-    const kinds = { ...d.kinds };
+    const { regions, levels, kinds } = copy();
     for (const x of ids) { delete regions[x]; delete levels[x]; delete kinds[x]; }
-    set({ regions, levels, kinds });
-    setLinks(links.map((g) => g.filter((x) => !ids.includes(x))));
+    set({ regions, levels, kinds, links: d.links.map((g) => g.filter((x) => !ids.includes(x))) });
   }
 
-  async function save() {
-    const pains = entries.value.filter((e): e is PainEntry => e.type === 'pain');
-    const slot = editing ? d.slot : pendingSlot.value ?? s.checkinTimes.find((t) => slotStatus(t, pains) === 'due') ?? null;
-    // Overall pain is the worst marked area; older entries without area levels keep their own.
-    const lv = Object.values(d.levels);
-    const out: PainEntry = {
-      ...d,
-      intensity: lv.length ? Math.max(...lv) : d.intensity ?? null,
-      time: timeSet ? d.time : Date.now(),
-      slot: d.mode === 'checkin' ? slot : null,
-    };
-    if (editing) { await saveEntry(out); closeSheet(); showToast('Saved'); return; }
-    const ids: string[] = [];
-    for (const x of itemsToEntries(extras)) ids.push((await saveEntry(x)).id);
-    if (painTouched) ids.push((await saveEntry(out)).id);
-    navigator.vibrate?.(12);
-    pendingSlot.value = null;
-    setD(blank());
-    setExtras([]);
-    setLinks([]);
-    setTimeSet(false);
-    setOpen(null);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    const msg = 'Saved';
-    showToast(msg, { label: 'Undo', run: () => ids.forEach((id) => removeEntry(id)) });
-  }
-
-  const body = (
-    <>
-      {s.steps.where && (
-        <section class="section">
-          <div class="group pad tight">
-            <BodyMap value={d.regions} levels={d.levels} onTap={tapRegion} onRange={addRange} incision={s.incision} />
-          </div>
-          {regionIds.length > 0 && (
-            <div class="group" style={{ marginTop: 8 }}>
-              {regionIds.filter((id) => (groupOf.get(id)?.[0] ?? id) === id).map((id) => {
-                const g = groupOf.get(id);
-                const label = g ? spineRangeLabel(spineIdx(g[0]), spineIdx(g[g.length - 1])) : regionLabel(id);
-                return (
-                  <div class="arow" key={g ? g.join() : id}>
-                    <div class="arow-line">
-                      {g ? (
-                        <button class="arow-label group-label" aria-label={`${label}, ${g.length} vertebrae. Separate`} onClick={() => setLinks(links.filter((x) => !x.some((y) => g.includes(y))))}>
-                          {label}<span class="group-count">{g.length}</span>
-                        </button>
-                      ) : <span class="arow-label">{label}</span>}
-                      <PainSlider value={d.levels[id]} onChange={(level) => setArea(id, { level })} label={label} />
-                      {id.startsWith('spine-') && (
-                        <span class="spine-step">
-                          <button class="x-btn" aria-label="One vertebra higher" onClick={() => moveSpine(g ?? [id], -1)}><IconUpChev /></button>
-                          <button class="x-btn" aria-label="One vertebra lower" onClick={() => moveSpine(g ?? [id], 1)}><IconDownChev /></button>
-                        </span>
-                      )}
-                      <PainPill n={d.levels[id] ?? null} />
-                      <button class="x-btn" aria-label={`Remove ${label}`} onClick={() => removeArea(id)}><IconClose /></button>
-                    </div>
-                    <KindChips value={d.kinds[id] ?? []} onChange={(kinds) => setArea(id, { kinds })} />
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
-      )}
-
-      {s.steps.symptoms && (
-        <section class="section">
-          <div class="sec-head"><span>Symptoms</span></div>
-          <div class="group pad">
-            <SymptomPicker options={s.symptoms} value={d.symptoms} onChange={(symptoms) => set({ symptoms })} />
-          </div>
-        </section>
-      )}
-
-      {!editing && <SinceLast items={extras} onChange={setExtras} />}
-
-      <section class="section">
-        <div class="sec-head"><span>Details</span></div>
-        <div class="group">
-          <Expand id="time" open={open} setOpen={setOpen} label="Time" value={timeSet ? fmtTime(d.time) : 'Now'} isSet={timeSet}>
-            <WhenPicker value={d.time} onChange={(time) => { set({ time }); setTimeSet(true); }} />
-          </Expand>
-          <Expand id="trend" open={open} setOpen={setOpen} label="Since last time" value={TRENDS.find((t) => t.v === d.trend)?.label ?? ''}>
-            <Seg
-              options={TRENDS.map((t) => ({ ...t }))}
-              value={d.trend ?? null}
-              onChange={(trend) => set({ trend: trend as Draft['trend'], mode: trend === 'better' || trend === 'worse' ? 'change' : 'checkin' })}
-            />
-          </Expand>
-          {s.steps.duration && (
-            <Expand id="duration" open={open} setOpen={setOpen} label="How long it lasts" value={d.duration ?? ''}>
-              <Chips single options={DURATIONS} value={d.duration ? [d.duration] : []} onChange={(v) => set({ duration: v[0] ?? null })} />
-            </Expand>
-          )}
-          {s.steps.impact && (
-            <Expand id="impact" open={open} setOpen={setOpen} label="Getting in the way of" value={IMPACTS.filter((i) => (d.impacts[i.id] ?? 0) > 0).map((i) => i.label).join(', ')}>
-              <div class="stack">
-                {IMPACTS.map((im) => (
-                  <div class="impact-row" key={im.id}>
-                    <span>{im.label}</span>
-                    <Seg<Level | null> options={[{ v: 0, label: 'No' }, { v: 1, label: 'Some' }, { v: 2, label: 'A lot' }]} value={d.impacts[im.id] ?? null} onChange={(v) => set({ impacts: { ...d.impacts, [im.id]: v } })} />
-                  </div>
-                ))}
-              </div>
-            </Expand>
-          )}
-          {s.steps.context && (
-            <Expand id="context" open={open} setOpen={setOpen} label="Activities" value={d.activities.join(', ')}>
-              <ActivityTiles options={s.activities} value={d.activities} onChange={(activities) => set({ activities })} onAdd={(v) => rememberChip('activities', v)} />
-            </Expand>
-          )}
-          {s.steps.note && (
-            <Expand id="note" open={open} setOpen={setOpen} label="Note" value={d.note}>
-              <textarea class="input"  value={d.note} onInput={(e) => set({ note: (e.target as HTMLTextAreaElement).value })} />
-            </Expand>
-          )}
-        </div>
-      </section>
-    </>
-  );
-
-  if (editing) {
-    return (
-      <Sheet title={d.mode === 'change' ? 'Pain Change' : 'Check-In'} onClose={closeSheet} action={{ label: 'Save', onClick: save }} tall>
-        {body}
-        <section class="section">
-          <div class="group">
-            <button class="row-item danger" onClick={async () => { if (confirm('Delete this entry?')) { await removeEntry(d.id); closeSheet(); showToast('Deleted'); } }}>
-              <span class="row-label">Delete Entry</span>
-            </button>
-          </div>
-        </section>
-      </Sheet>
-    );
+  function setSymptoms(symptoms: string[]) {
+    const symptomLevels = Object.fromEntries(Object.entries(d.symptomLevels ?? {}).filter(([k]) => symptoms.includes(k)));
+    set({ symptoms, symptomLevels });
   }
 
   return (
-    <div class="screen has-savebar">
+    <>
+      {s.steps.where && (
+        <div class="pad-box tight">
+          <BodyMap value={d.regions} levels={d.levels} onTap={tapRegion} onRange={addRange} incision={s.incision} />
+        </div>
+      )}
+      {regionIds.filter((id) => (groupOf.get(id)?.[0] ?? id) === id).map((id) => {
+        const g = groupOf.get(id);
+        const label = g ? spineRangeLabel(spineIdx(g[0]), spineIdx(g[g.length - 1])) : regionLabel(id);
+        return (
+          <div class="arow" key={g ? g.join() : id}>
+            <div class="arow-line">
+              {g ? (
+                <button class="arow-label group-label" aria-label={`${label}, ${g.length} vertebrae. Separate`} onClick={() => set({ links: d.links.filter((x) => !x.some((y) => g.includes(y))) })}>
+                  {label}<span class="group-count">{g.length}</span>
+                </button>
+              ) : <span class="arow-label">{label}</span>}
+              <PainSlider value={d.levels[id]} onChange={(level) => setArea(id, { level })} label={label} />
+              {id.startsWith('spine-') && (
+                <span class="spine-step">
+                  <button class="x-btn" aria-label="One vertebra higher" onClick={() => moveSpine(g ?? [id], -1)}><IconUpChev /></button>
+                  <button class="x-btn" aria-label="One vertebra lower" onClick={() => moveSpine(g ?? [id], 1)}><IconDownChev /></button>
+                </span>
+              )}
+              <PainPill n={d.levels[id] ?? null} />
+              <button class="x-btn" aria-label={`Remove ${label}`} onClick={() => removeArea(id)}><IconClose /></button>
+            </div>
+            <KindChips value={d.kinds[id] ?? []} onChange={(kinds) => setArea(id, { kinds })} />
+          </div>
+        );
+      })}
+      {s.steps.symptoms && (
+        <div class="pad-box">
+          <SymptomPicker options={s.symptoms} value={d.symptoms} onChange={setSymptoms} />
+        </div>
+      )}
+      {MAIN_SYMPTOMS.filter((x) => d.symptoms.includes(x)).map((x) => (
+        <div class="arow" key={x}>
+          <div class="arow-line">
+            <span class="arow-label">{x}</span>
+            <PainSlider value={d.symptomLevels?.[x]} onChange={(v) => set({ symptomLevels: { ...d.symptomLevels, [x]: v } })} label={`${x} strength`} />
+            <PainPill n={d.symptomLevels?.[x] ?? null} />
+          </div>
+        </div>
+      ))}
+      <WhenRow value={d.when} onChange={(when) => set({ when })} />
+      {s.steps.duration && (
+        <FieldRow label="Lasted">
+          <Pick options={[...DURATIONS, ...(d.duration && !DURATIONS.includes(d.duration) ? [d.duration] : [])].map((v) => ({ v, label: v }))} value={d.duration} onChange={(v) => set({ duration: v ?? null })} />
+        </FieldRow>
+      )}
+      {s.steps.impact && (
+        <FieldRow label="Affected">
+          <div class="kinds">
+            {IMPACTS.map((im) => {
+              const v = d.impacts[im.id] ?? 0;
+              const next = ((v + 1) % 3) as Level;
+              return (
+                <button key={im.id} class={'kind' + (v ? ' on' : '')} aria-pressed={!!v} onClick={() => set({ impacts: { ...d.impacts, [im.id]: next || null } })}>
+                  {im.label}{v === 1 ? ' · some' : v === 2 ? ' · a lot' : ''}
+                </button>
+              );
+            })}
+          </div>
+        </FieldRow>
+      )}
+      {s.steps.note && (
+        <FieldRow label="Note">
+          <input class="input note-input" value={d.note} onInput={(e) => set({ note: (e.target as HTMLInputElement).value })} />
+        </FieldRow>
+      )}
+    </>
+  );
+}
+
+const fromEntry = (entry: PainEntry): Draft => {
+  const d: Draft = {
+    ...entry,
+    levels: entry.levels ?? {},
+    kinds: entry.kinds ?? Object.fromEntries(Object.entries(entry.regions).map(([k, v]) => [k, [v]])),
+    symptomLevels: entry.symptomLevels ?? {},
+    when: entry.time,
+    links: [],
+  };
+  return { ...d, links: initialLinks(d) };
+};
+
+/** Home: pick a symptom, posture, medication or exercise; stack as many as you like; save them together. */
+export function CheckIn({ entry }: { entry?: PainEntry }) {
+  return entry ? <EditSymptom entry={entry} /> : <Home />;
+}
+
+function EditSymptom({ entry }: { entry: PainEntry }) {
+  const [d, setD] = useState(() => fromEntry(entry));
+  async function save() {
+    await saveEntry(toEntry(d, Date.now()));
+    closeSheet();
+    showToast('Saved');
+  }
+  return (
+    <Sheet title="Symptom" onClose={closeSheet} action={{ label: 'Save', onClick: save }} tall>
+      <section class="section"><div class="group"><SymptomEditor d={d} onChange={setD} /></div></section>
+      <section class="section">
+        <div class="group">
+          <button class="row-item danger" onClick={async () => { if (confirm('Delete this entry?')) { await removeEntry(d.id); closeSheet(); showToast('Deleted'); } }}>
+            <span class="row-label">Delete Entry</span>
+          </button>
+        </div>
+      </section>
+    </Sheet>
+  );
+}
+
+const KINDS: CardKind[] = ['symptom', 'posture', 'med', 'exercise'];
+
+function Home() {
+  const s = settings.value;
+  const [cards, setCards] = useState<Card[]>(() => (pendingSlot.value ? [newCard('symptom')] : []));
+  const added = useRef<string | null>(null);
+
+  // A reminder opened the app: start with a symptom card.
+  useEffect(() => {
+    if (pendingSlot.value && !cards.some((c) => c.kind === 'symptom')) setCards((cs) => [newCard('symptom'), ...cs]);
+  }, [pendingSlot.value]);
+
+  // Bring a newly added card into view.
+  useEffect(() => {
+    if (!added.current) return;
+    document.getElementById('card-' + added.current)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    added.current = null;
+  }, [cards.length]);
+
+  const add = (kind: CardKind) => {
+    const c = newCard(kind);
+    if (cards.length) added.current = c.key;
+    setCards([...cards, c]);
+    navigator.vibrate?.(8);
+  };
+  const update = (key: string, c: Card) => setCards((cs) => cs.map((x) => (x.key === key ? c : x)));
+  const remove = (key: string) => setCards((cs) => cs.filter((x) => x.key !== key));
+  const ready = cards.filter((c) => (c.kind === 'symptom' ? painTouched(c.d) : cardReady(c)));
+
+  async function save() {
+    const now = Date.now();
+    const group = ready.length > 1 ? uid() : undefined;
+    const pains = entries.value.filter((e): e is PainEntry => e.type === 'pain');
+    const due = pendingSlot.value ?? s.checkinTimes.find((t) => slotStatus(t, pains) === 'due') ?? null;
+    const ids: string[] = [];
+    for (const c of ready) {
+      const e = c.kind === 'symptom'
+        ? toEntry(c.d, now, { group, slot: c.d.when == null ? due : null })
+        : cardEntry(c, now, group);
+      ids.push((await saveEntry(e)).id);
+    }
+    navigator.vibrate?.(12);
+    pendingSlot.value = null;
+    setCards([]);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    showToast('Saved', { label: 'Undo', run: () => ids.forEach((id) => removeEntry(id)) });
+  }
+
+  return (
+    <div class={'screen' + (cards.length ? ' has-savebar' : '')}>
       <header class="bar">
         <h1>Check In</h1>
         <LastReading />
@@ -341,38 +361,53 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
         <button class="nav-btn" aria-label="Log something else" onClick={() => openSheet('add')}><IconPlus /></button>
         <button class="nav-btn" aria-label="Settings" onClick={() => go('settings')}><IconGear /></button>
       </header>
-      {body}
-      <div class="savebar">
-        <button class="btn primary wide" disabled={!touched} onClick={save}>
-          {pendingSlot.value ? `Save ${fmtSlot(pendingSlot.value)} Check-In` : 'Save'}
-        </button>
-      </div>
+
+      {cards.length === 0 ? (
+        <div class="log-pick">
+          {KINDS.map((k) => {
+            const st = CARD_STYLE[k];
+            return <button key={k} onClick={() => add(k)}><span style={{ background: st.color }}><st.Icon /></span>{st.label}</button>;
+          })}
+        </div>
+      ) : (
+        <>
+          {cards.map((c) => (
+            <div id={'card-' + c.key} key={c.key}>
+              {c.kind === 'symptom' ? (
+                <CardShell kind="symptom" onRemove={() => remove(c.key)}>
+                  <SymptomEditor d={c.d} onChange={(d) => update(c.key, { ...c, d })} />
+                </CardShell>
+              ) : (
+                <OtherCardView card={c} onChange={(n) => update(c.key, n)} onRemove={() => remove(c.key)} />
+              )}
+            </div>
+          ))}
+          <section class="section">
+            <div class="sec-head"><span>Add</span></div>
+            <div class="add-row">
+              {KINDS.map((k) => {
+                const st = CARD_STYLE[k];
+                return <button key={k} onClick={() => add(k)}><span style={{ background: st.color }}><st.Icon /></span>{st.label}</button>;
+              })}
+            </div>
+          </section>
+          <div class="savebar">
+            <button class="btn primary wide" disabled={!ready.length} onClick={save}>
+              {pendingSlot.value ? `Save ${fmtSlot(pendingSlot.value)} Check-In` : 'Save'}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
 function LastReading() {
-  const last = [...entries.value].reverse().find((e): e is PainEntry => e.type === 'pain');
+  const last = [...entries.value].reverse().find((e): e is PainEntry => e.type === 'pain' && e.intensity != null);
   if (!last) return null;
   return (
     <button class="last" onClick={() => go('history')}>
       <PainPill n={last.intensity} /> {ago(last.time)}
     </button>
-  );
-}
-
-function Expand({ id, open, setOpen, label, value, isSet = !!value, children }: {
-  id: Detail; open: Detail | null; setOpen: (d: Detail | null) => void; label: string; value?: string; isSet?: boolean; children: ComponentChildren;
-}) {
-  const isOpen = open === id;
-  return (
-    <div class={'expand' + (isOpen ? ' open' : '')}>
-      <button class="row-item" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : id)}>
-        <span class="row-label">{label}</span>
-        <span class={'row-value' + (isSet ? ' set' : '')}>{value}</span>
-        <span class="row-chev"><IconChevron /></span>
-      </button>
-      {isOpen && <div class="expand-body">{children}</div>}
-    </div>
   );
 }

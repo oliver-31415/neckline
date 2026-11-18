@@ -5,6 +5,8 @@ const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceSc
 const page = await ctx.newPage();
 await page.goto(process.argv[2] ?? 'http://localhost:4173/#/checkin');
 await page.waitForTimeout(800);
+await page.click('.log-pick button:has-text("Symptom")');
+await page.waitForTimeout(200);
 const cdp = await ctx.newCDPSession(page);
 const box = await page.locator('.zoom-box').boundingBox();
 const cx = box.x + box.width * 0.35, cy = box.y + box.height * 0.3; // around the neck

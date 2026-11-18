@@ -32,7 +32,7 @@ export function entriesCsv(list: Entry[]): File {
         r['Feels like'] = entryKindLabels(e).join('; ');
         r['Lasts'] = e.duration ?? '';
         for (const i of IMPACTS) r[`Affects ${i.label.toLowerCase()}`] = e.impacts[i.id] != null ? IMPACT_LEVEL[e.impacts[i.id]!] : '';
-        r['Other symptoms'] = e.symptoms.join('; ');
+        r['Other symptoms'] = e.symptoms.map((x) => (e.symptomLevels?.[x] != null ? `${x} (${e.symptomLevels[x]}/10)` : x)).join('; ');
         r['Posture'] = e.postures.map((p) => POSTURES[p]?.label ?? p).join('; ');
         r['Activity'] = e.activities.join('; ');
         break;

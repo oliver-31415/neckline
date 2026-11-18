@@ -74,7 +74,7 @@ export const ARM_SHAPES: Shape[] = [
 
 /** Areas offered as chips under the diagram rather than drawn. */
 export function extraAreas(incision: Incision | null) {
-  return [...(incision ? [{ id: 'incision', label: 'Incision' }] : []), { id: 'arm-L', label: 'Left arm' }];
+  return incision ? [{ id: 'incision', label: 'Incision' }] : [];
 }
 
 const SIDE = { L: 'Left', R: 'Right' } as const;

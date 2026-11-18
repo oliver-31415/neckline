@@ -168,6 +168,10 @@ export async function buildReport(all: Entry[], s: Settings, o: ReportOptions): 
     if (q.length) rows.push(['Described as', q.slice(0, 8).map(([k, c]) => `${k.toLowerCase()} ${Math.round((c / n) * 100)}%`).join(', ')]);
     if (du.length) rows.push(['How long it lasted', du.sort((a, b) => DURATIONS.indexOf(a[0]) - DURATIONS.indexOf(b[0])).map(([k, c]) => `${k.toLowerCase()} (${c})`).join(', ')]);
     if (sy.length) rows.push(['Other symptoms', sy.slice(0, 10).map(([k, c]) => `${k.toLowerCase()} (${c})`).join(', ')]);
+    for (const x of ['Headache', 'Migraine']) {
+      const lv = pains.flatMap((p) => (p.symptomLevels?.[x] != null ? [p.symptomLevels[x]] : []));
+      if (lv.length) rows.push([`${x} strength`, `average ${fmt1(mean(lv))}, highest ${Math.max(...lv)} (${lv.length} rated)`]);
+    }
     for (const i of IMPACTS) {
       const x = im[i.id];
       if (x) rows.push([`Affected ${i.label.toLowerCase()}`, `some ${x.some}, a lot ${x.lot}, not at all ${x.answered - x.some - x.lot} (of ${x.answered} answers)`]);

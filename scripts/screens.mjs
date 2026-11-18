@@ -93,16 +93,8 @@ await tab('report'); await shot('04-report');
 await tab('settings'); await shot('05-settings');
 
 await tab('checkin');
-// Tap the diagram at viewBox coordinates, like a finger would.
-const mapTap = async (vx, vy) => {
-  const svg = page.locator('.bodymap-svg').first();
-  await svg.evaluate((el) => el.scrollIntoView({ block: 'center' }));
-  const b = await svg.boundingBox();
-  const k = b.width / 300;
-  await page.mouse.click(b.x + (vx - 10) * k, b.y + (vy - 4) * k);
-  await page.waitForTimeout(120);
-};
-// Back panel (viewBox 0 4 200 280) and arm panel (0 4 120 280).
+await page.click('.log-pick button:has-text("Symptom")');
+// Back panel (viewBox 0 4 200 280) and arm panel (0 4 120 280), tapped like a finger would.
 const panelTap = async (n, vx, vy, vw) => {
   const svg = page.locator('.bodymap-svg').nth(n);
   await svg.evaluate((el) => el.scrollIntoView({ block: 'center' }));
@@ -112,48 +104,37 @@ const panelTap = async (n, vx, vy, vw) => {
   await page.waitForTimeout(120);
 };
 await panelTap(0, 115, 85, 200); // right upper neck
-await panelTap(0, 100, 115, 200); // spine C5
 await panelTap(0, 168, 200, 200); // right shoulder blade
-await panelTap(1, 60, 100, 120);  // right upper arm
 await panelTap(1, 75, 262, 120);  // right index finger
 await page.locator('.arow').last().locator('.kind:has-text("Tingling")').click();
 await page.locator('.arow').nth(0).locator('.kind:has-text("Ache")').click();
-await page.locator('.arow').nth(0).locator('.kind:has-text("Stiff")').click();
-await page.locator('.arow').nth(0).locator('.slider').evaluate((el) => el.scrollIntoView({ block: 'center' }));
-{ const b = await page.locator('.arow').nth(0).locator('.slider').boundingBox(); await page.mouse.click(b.x + b.width * 0.75, b.y + b.height / 2); }
 await centerClick('.chip:has-text("Headache")');
 await page.selectOption('.select-chip select', 'Dizziness');
-await page.selectOption('.select-chip select', 'Fatigue');
-await page.waitForTimeout(2000);
+{ const sl = page.locator('.arow:has-text("Headache") .slider'); await sl.evaluate((el) => el.scrollIntoView({ block: 'center' })); const b = await sl.boundingBox(); await page.mouse.click(b.x + b.width * 0.6, b.y + b.height / 2); }
+await centerClick('.frow:has-text("Lasted") .kind:has-text("2 h")');
+await centerClick('.frow:has-text("Affected") .kind:has-text("Sleep")');
+await page.waitForTimeout(1800);
 await page.evaluate(() => window.scrollTo(0, 0));
 await shot('06-checkin-filled', false);
-await page.evaluate(() => window.scrollTo(0, 700));
+await page.locator('.arow:has-text("Headache")').evaluate((el) => el.scrollIntoView({ block: 'start' }));
+await page.evaluate(() => window.scrollBy(0, -120));
 await shot('07-checkin-regions', false);
-await page.click('.quick-add button:has-text("Posture")');
-await page.click('.mini-tile:has-text("Looking down")');
-await page.click('.mini-tile:has-text("Sitting on couch")');
-await page.click('.mini-tile:has-text("Office chair")');
-await page.click('.mini-tile:has-text("Looking down")');
-await page.locator('.arow:has(.item-name)').nth(0).locator('.kind:has-text("1 h")').first().click();
-await page.locator('.arow:has(.item-name)').nth(1).locator('.kind:has-text("15 min")').click();
-await page.click('.quick-add button:has-text("Exercise")');
-await page.click('.add-chip:has-text("Walk")');
-await page.click('.add-chip:has-text("Stretches")');
-await page.locator('.arow:has(.item-name)').nth(4).locator('.kind:has-text("45 min")').click();
-await page.locator('.arow:has(.item-name)').nth(5).locator('.kind:has-text("10 min")').click();
-await page.locator('.arow:has(.item-name)').nth(5).locator('.kind:has-text("30 s")').click();
-await page.click('.quick-add button:has-text("Medication")');
-await page.fill('.picker input', 'Naproxen');
-await page.click('.picker button:has-text("Add")');
-await page.locator('.input.dose').fill('250 mg');
-await page.locator('.quick-add').evaluate((el) => el.scrollIntoView({ block: 'start' }));
-await page.evaluate(() => window.scrollBy(0, -60));
-await shot('07b-since-last', false);
-await centerClick('.row-item:has-text("Since last time")');
-await centerClick('.seg button:has-text("Worse")');
-await centerClick('.row-item:has-text("How long it lasts")');
-await centerClick('.chip:has-text("Hours")');
+await centerClick('.add-row button:has-text("Posture")');
+await shot('07a-posture-card', false);
+await centerClick('.log-card .mini-tile:has-text("Sitting on couch")');
+await centerClick('.log-card:has-text("Sitting on couch") .kind:has-text("Yesterday")');
+await centerClick('.log-card:has-text("Sitting on couch") .kind:has-text("2 h") >> nth=-1');
+await centerClick('.add-row button:has-text("Medication")');
+await page.locator('.log-card input.input').last().fill('Naproxen');
+await centerClick('.log-card button:has-text("Add")');
+await page.locator('.log-card .input.dose').fill('250 mg');
+await centerClick('.log-card:has-text("Naproxen") .kind:has-text("1 h ago")');
+await centerClick('.add-row button:has-text("Exercise")');
+await centerClick('.log-card .chip:has-text("Walk")');
+await centerClick('.log-card:has-text("Walk") .frow:has-text("For") .kind:has-text("45 min")');
 await page.evaluate(() => window.scrollTo(0, 99999));
+await shot('07b-since-last', false);
+await page.evaluate(() => window.scrollBy(0, -500));
 await shot('08-checkin-details', false);
 await page.click('.savebar .btn');
 await page.waitForTimeout(400);
