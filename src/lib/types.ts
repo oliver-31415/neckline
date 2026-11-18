@@ -80,13 +80,6 @@ export interface SavedTreatment {
   dose?: string;
 }
 
-export interface Incision {
-  view: 'front' | 'back';
-  x: number;
-  y: number;
-  orient: 'h' | 'v';
-}
-
 export type StepId =
   | 'intensity' | 'where' | 'quality' | 'duration' | 'impact' | 'symptoms' | 'context' | 'note';
 
@@ -108,7 +101,6 @@ export interface Settings {
   mealTags: string[];
   sideEffects: string[];
   treatments: SavedTreatment[];
-  incision: Incision | null;
   surgeryDate: string;
   lastAppointment: string;
   nextAppointment: string;

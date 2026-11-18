@@ -62,14 +62,6 @@ export function Settings() {
         <label class="field"><span>Surgery date</span><input type="date" class="input" value={s.surgeryDate} onChange={(e) => updateSettings({ surgeryDate: (e.target as HTMLInputElement).value })} /></label>
       </Block>
 
-      <Block title="Incision">
-        <Seg<string | null>
-          options={[{ v: 'front', label: 'Front of neck' }, { v: 'back', label: 'Back of neck' }]}
-          value={s.incision?.view ?? null}
-          onChange={(v) => updateSettings({ incision: v ? { view: v as 'front' | 'back', x: 0, y: 0, orient: v === 'front' ? 'h' : 'v' } : null })}
-        />
-      </Block>
-
       <Block title="Check-in times">
         <div class="chips">
           {s.checkinTimes.map((t) => (

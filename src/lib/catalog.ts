@@ -105,7 +105,6 @@ export const DEFAULT_SETTINGS: Settings = {
   mealTags: DEFAULT_MEAL_TAGS,
   sideEffects: DEFAULT_SIDE_EFFECTS,
   treatments: [],
-  incision: null,
   surgeryDate: '',
   lastAppointment: '',
   nextAppointment: '',

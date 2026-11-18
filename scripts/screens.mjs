@@ -77,7 +77,7 @@ await page.evaluate(async (list) => {
   const db = await new Promise((res, rej) => { const q = indexedDB.open('neckline'); q.onsuccess = () => res(q.result); q.onerror = rej; });
   const tx = db.transaction(['entries', 'kv'], 'readwrite');
   for (const e of list) tx.objectStore('entries').put(e);
-  tx.objectStore('kv').put({ name: 'Sample Person', surgeryDate: '2026-09-28', lastAppointment: new Date(Date.now() - 20 * 864e5).toLocaleDateString('en-CA'), nextAppointment: new Date(Date.now() + 3 * 864e5).toLocaleDateString('en-CA'), incision: { view: 'front', x: 152, y: 118, orient: 'h' }, treatments: [{ name: 'Ibuprofen', kind: 'medication', dose: '400 mg' }, { name: 'Heat', kind: 'heat', dose: '15 min' }], questions: [{ id: 'q1', text: 'Is the tingling in my right thumb expected at 7 weeks?', done: false }, { id: 'q2', text: 'When can I start driving longer distances?', done: false }], onboarded: true }, 'settings');
+  tx.objectStore('kv').put({ name: 'Sample Person', surgeryDate: '2026-09-28', lastAppointment: new Date(Date.now() - 20 * 864e5).toLocaleDateString('en-CA'), nextAppointment: new Date(Date.now() + 3 * 864e5).toLocaleDateString('en-CA'), treatments: [{ name: 'Ibuprofen', kind: 'medication', dose: '400 mg' }, { name: 'Heat', kind: 'heat', dose: '15 min' }], questions: [{ id: 'q1', text: 'Is the tingling in my right thumb expected at 7 weeks?', done: false }, { id: 'q2', text: 'When can I start driving longer distances?', done: false }], onboarded: true }, 'settings');
   await new Promise((r) => (tx.oncomplete = r));
 }, sample());
 

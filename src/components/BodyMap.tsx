@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { IconZoomIn, IconZoomOut } from './Icons';
-import type { Incision, Sensation } from '../lib/types';
+import type { Sensation } from '../lib/types';
 import { painBg } from './ui';
 
 /*
@@ -72,15 +72,10 @@ export const ARM_SHAPES: Shape[] = [
   { id: 'finger-thumb-R', d: 'M88 224 C94 228 99 236 102 245 C104 251 99 255 95 251 C92 247 89 241 87 236 Z' },
 ];
 
-/** Areas offered as chips under the diagram rather than drawn. */
-export function extraAreas(incision: Incision | null) {
-  return incision ? [{ id: 'incision', label: 'Incision' }] : [];
-}
-
 const SIDE = { L: 'Left', R: 'Right' } as const;
 export const REGION_LABELS: Record<string, string> = (() => {
   const out: Record<string, string> = {
-    head: 'Head', 'head-back': 'Back of head', 'neck-front': 'Front of neck', incision: 'Incision', 'arm-L': 'Left arm',
+    head: 'Head', 'head-back': 'Back of head', 'neck-front': 'Front of neck', 'arm-L': 'Left arm',
     'upper-back': 'Between shoulder blades',
   };
   const names: Record<string, string> = {
@@ -134,10 +129,9 @@ interface Props {
   onTap?: (id: string) => void; // makes the map interactive
   onRange?: (ids: string[]) => void; // a drag along the spine
   heat?: Record<string, number>; // 0..1, read-only heat map
-  incision?: Incision | null;
 }
 
-export function BodyMap({ value = {}, levels = {}, onTap, onRange, heat, incision = null }: Props) {
+export function BodyMap({ value = {}, levels = {}, onTap, onRange, heat }: Props) {
   const [view, setView] = useState<View>('back');
   const [flash, setFlash] = useState<string | null>(null);
   const [drag, setDrag] = useState<{ from: number; to: number } | null>(null);
@@ -290,9 +284,6 @@ export function BodyMap({ value = {}, levels = {}, onTap, onRange, heat, incisio
           <button class={!front ? 'on' : ''} onClick={() => setView('back')}>Back</button>
           <button class={front ? 'on' : ''} onClick={() => setView('front')}>Front</button>
         </div>
-        {!heat && extraAreas(incision).map((x) => (
-          <button key={x.id} class={'chip' + (value[x.id] ? ' on' : '')} aria-pressed={!!value[x.id]} onClick={() => interactive && tap(x.id)} disabled={!interactive}>{x.label}</button>
-        ))}
       </div>
     </div>
   );

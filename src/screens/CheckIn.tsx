@@ -80,7 +80,6 @@ function FeelsLike({ value, onChange }: { value: Sensation[]; onChange: (v: Sens
 
 /** The diagram and one row per marked area. */
 function AreaEditor({ d, set }: { d: Draft; set: (p: Partial<Draft>) => void }) {
-  const s = settings.value;
   const regionIds = Object.keys(d.regions);
   const groups = groupsOf(d.links, d.regions);
   const groupOf = new Map(groups.flatMap((g) => g.map((id) => [id, g] as const)));
@@ -141,7 +140,7 @@ function AreaEditor({ d, set }: { d: Draft; set: (p: Partial<Draft>) => void }) 
   return (
     <>
       <div class="pad-box tight">
-        <BodyMap value={d.regions} levels={d.levels} onTap={tapRegion} onRange={addRange} incision={s.incision} />
+        <BodyMap value={d.regions} levels={d.levels} onTap={tapRegion} onRange={addRange} />
       </div>
       {regionIds.filter((id) => (groupOf.get(id)?.[0] ?? id) === id).map((id) => {
         const g = groupOf.get(id);
