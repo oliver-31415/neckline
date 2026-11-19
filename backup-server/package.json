@@ -1,0 +1,8 @@
+{
+  "name": "neckline-backup-server",
+  "private": true,
+  "type": "module",
+  "description": "Encrypted backup server for Neckline. Holds only ciphertext; the phone encrypts with a key from your password.",
+  "scripts": { "start": "node server.mjs" },
+  "engines": { "node": ">=20" }
+}

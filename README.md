@@ -5,9 +5,11 @@ It records how post-surgical neck pain changes over time alongside posture,
 activities, food, sleep and treatments, and helps you prepare for appointments.
 It doesn't diagnose anything.
 
-- **Local only.** Entries and meal photos live in the phone's IndexedDB. No
-  accounts, no analytics and no network calls, apart from the optional
-  reminder server, which only knows your check-in times.
+- **Local only.** Entries and meal photos live in the phone's IndexedDB, and
+  the app asks the browser to keep them permanently (persistent storage). No
+  analytics, and no network calls apart from two optional servers you run
+  yourself: reminders, which only know your check-in times, and encrypted
+  backups, which can't read what they store.
 - **Opens on the check-in.** One overall pain slider, a body diagram you tap,
   and a slider for each marked area. Everything else (what it feels like,
   duration, impact, symptoms, what you were doing, a note) sits in optional rows
@@ -55,9 +57,10 @@ On the iPhone: open the URL in Safari → Share → **Add to Home Screen**, and
 always open it from that icon. A Home Screen app has its own storage, separate
 from Safari tabs.
 
-## Reminders (optional)
+## Reminders and backups (optional)
 
-See [`push-server/README.md`](push-server/README.md).
+See [`push-server/README.md`](push-server/README.md) and
+[`backup-server/README.md`](backup-server/README.md).
 
 ## Backups
 

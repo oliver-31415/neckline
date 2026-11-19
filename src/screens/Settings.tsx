@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
-import { settings, updateSettings, wipe, entries } from '../lib/store';
+import { settings, updateSettings, wipe, entries, persisted, keepData } from '../lib/store';
+import { ServerBackup } from './ServerBackup';
 import { go } from '../lib/nav';
 import { POSTURES, STEPS } from '../lib/catalog';
 import { fmtSlot } from '../lib/time';
@@ -134,7 +135,15 @@ export function Settings() {
         <Seg options={[{ v: 'system', label: 'Automatic' }, { v: 'light', label: 'Light' }, { v: 'dark', label: 'Dark' }]} value={s.theme} onChange={(theme) => updateSettings({ theme: theme ?? 'system' })} />
       </Block>
 
+      <ServerBackup />
+
       <Block title="Your data" aside={usage}>
+        <div class="row between">
+          <span>Kept on this phone</span>
+          {persisted.value
+            ? <span style={{ color: 'var(--good)', fontWeight: 600 }}>Protected</span>
+            : <button class="btn sm" onClick={async () => !(await keepData()) && showToast(isStandalone() ? 'iOS didn’t allow it yet' : 'Open from the Home Screen icon')}>Protect</button>}
+        </div>
         <div class="row between"><span>Include meal photos</span><Toggle checked={withPhotos} label="Include meal photos" onChange={setWithPhotos} /></div>
         <button class="btn wide" onClick={async () => shareOrDownload(await makeBackup(withPhotos))}><IconDownload /> Save a backup file</button>
         <label class="btn wide" style={{ position: 'relative' }}>

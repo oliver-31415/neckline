@@ -510,3 +510,6 @@ textarea.input { min-height: 88px; resize: vertical; }
 .add-item .row-label { font-size: 16px; }
 .add-plus { width: 22px; height: 22px; color: var(--accent); flex: none; }
 .add-plus svg { width: 22px; height: 22px; stroke-width: 2.4; }
+
+/* backup server sign-in */
+.col-form { display: flex; flex-direction: column; gap: 12px; }

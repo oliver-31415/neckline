@@ -107,6 +107,8 @@ export interface Settings {
   questions: Question[];
   theme: 'system' | 'light' | 'dark';
   push: { serverUrl: string; token: string; enabled: boolean };
+  /** Encrypted copies on your own backup server. auth signs in; key encrypts and never leaves the phone. */
+  backup: { serverUrl: string; user: string; auth: string; key: string; auto: boolean; lastAt: number | null; lastHash: string };
   onboarded: boolean;
   /** Bumped when default lists change, so stored settings can be upgraded once. */
   version?: number;

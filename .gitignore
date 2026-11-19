@@ -3,3 +3,4 @@ dist
 push-server/node_modules
 push-server/data
 shots
+backup-server/data

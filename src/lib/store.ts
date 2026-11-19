@@ -6,6 +6,8 @@ import type { Entry, Settings } from './types';
 export const entries = signal<Entry[]>([]);
 export const settings = signal<Settings>(DEFAULT_SETTINGS);
 export const ready = signal(false);
+/** Whether the browser has agreed never to clear this app's data on its own. null = can't tell. */
+export const persisted = signal<boolean | null>(null);
 
 export const sortedDesc = computed(() => [...entries.value].sort((a, b) => b.time - a.time));
 
@@ -31,14 +33,30 @@ export async function init() {
   }
   settings.value = merged;
   ready.value = true;
-  // Ask iOS/Safari not to evict this data under storage pressure.
-  navigator.storage?.persist?.().catch(() => {});
+  keepData();
+}
+
+/**
+ * Asks for persistent storage, so iOS/Safari won't clear the diary when space runs low or after
+ * weeks without use. There's no prompt on iOS: WebKit decides, and grants it to Home Screen apps.
+ * Asked again on each launch and on the first save until it's granted.
+ */
+export async function keepData() {
+  const st = navigator.storage;
+  if (!st?.persist) return persisted.value;
+  try {
+    persisted.value = (await st.persisted?.()) || (await st.persist());
+  } catch {
+    persisted.value = false;
+  }
+  return persisted.value;
 }
 
 export async function saveEntry(e: Entry) {
   const now = Date.now();
   const next = { ...e, createdAt: e.createdAt || now, updatedAt: now } as Entry;
   await db.putEntry(next);
+  if (persisted.value === false) keepData();
   const others = entries.value.filter((x) => x.id !== next.id);
   entries.value = [...others, next].sort((a, b) => a.time - b.time);
   return next;

@@ -3,7 +3,7 @@ import { entries, replaceAll, settings } from '../lib/store';
 import type { Entry, Settings } from '../lib/types';
 import { stamp } from './files';
 
-interface Backup {
+export interface Backup {
   app: 'neckline';
   version: 1;
   exportedAt: string;
@@ -14,20 +14,35 @@ interface Backup {
 
 const toDataUrl = (b: Blob) => new Promise<string>((r) => { const f = new FileReader(); f.onload = () => r(f.result as string); f.readAsDataURL(b); });
 
-export async function makeBackup(withPhotos: boolean): Promise<File> {
-  const data: Backup = { app: 'neckline', version: 1, exportedAt: new Date().toISOString(), settings: settings.value, entries: entries.value };
+/** Settings as they go into a backup: without the backup server sign-in. */
+export function shareableSettings(s: Settings = settings.value): Settings {
+  return { ...s, backup: { ...s.backup, auth: '', key: '', lastHash: '' } };
+}
+
+export async function backupData(withPhotos: boolean): Promise<Backup> {
+  const data: Backup = { app: 'neckline', version: 1, exportedAt: new Date().toISOString(), settings: shareableSettings(), entries: entries.value };
   if (withPhotos) {
     data.photos = {};
     for (const [id, blob] of await allPhotos()) data.photos[id] = await toDataUrl(blob);
   }
-  return new File([JSON.stringify(data)], `neckline-backup-${stamp()}.json`, { type: 'application/json' });
+  return data;
+}
+
+export async function makeBackup(withPhotos: boolean): Promise<File> {
+  return new File([JSON.stringify(await backupData(withPhotos))], `neckline-backup-${stamp()}.json`, { type: 'application/json' });
 }
 
 /** Merges a backup into this device. Entries with the same id are replaced; nothing is deleted. */
-export async function restoreBackup(file: File, restoreSettings: boolean) {
-  const data = JSON.parse(await file.text()) as Backup;
-  if (data.app !== 'neckline' || !Array.isArray(data.entries)) throw new Error('This doesn’t look like a Neckline backup.');
+export async function applyBackup(data: Backup, restoreSettings: boolean) {
+  if (data?.app !== 'neckline' || !Array.isArray(data.entries)) throw new Error('This doesn’t look like a Neckline backup.');
   for (const [id, url] of Object.entries(data.photos ?? {})) await putPhoto(id, await (await fetch(url)).blob());
-  await replaceAll(data.entries, restoreSettings ? data.settings : null);
+  // This phone's backup sign-in always stays as it is.
+  await replaceAll(data.entries, restoreSettings ? { ...data.settings, backup: settings.value.backup } : null);
   return data.entries.length;
+}
+
+export async function restoreBackup(file: File, restoreSettings: boolean) {
+  let data: Backup;
+  try { data = JSON.parse(await file.text()); } catch { throw new Error('This doesn’t look like a Neckline backup.'); }
+  return applyBackup(data, restoreSettings);
 }

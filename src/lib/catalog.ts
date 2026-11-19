@@ -111,6 +111,7 @@ export const DEFAULT_SETTINGS: Settings = {
   questions: [],
   theme: 'system',
   push: { serverUrl: '', token: '', enabled: false },
+  backup: { serverUrl: '', user: '', auth: '', key: '', auto: true, lastAt: null, lastHash: '' },
   onboarded: false,
   version: 3,
 };
