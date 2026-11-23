@@ -1,7 +1,7 @@
 import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { signal } from '@preact/signals';
-import { IconChevron, IconPlus } from './Icons';
+import { IconChevron, IconMinus, IconPlus } from './Icons';
 import { painWord } from '../lib/catalog';
 import { fromLocalInput, toLocalInput, HOUR } from '../lib/time';
 import { sheet } from '../lib/nav';
@@ -150,46 +150,55 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
 }
 
 /* ---------- pain slider (0–10) ----------
- * Drag sideways or tap anywhere on the track. A vertical swipe scrolls the page instead,
- * so starting a scroll on the slider never changes the value. */
+ * Drag sideways or tap anywhere on the track, or step with − and + either side.
+ * A vertical swipe scrolls the page instead, so starting a scroll on the slider never changes the value.
+ * Unrated, the thumb rests in the middle, so the first − or + steps from 5. */
 export function PainSlider({ value, onChange, label }: { value: number | null | undefined; onChange: (v: number) => void; label: string }) {
   const track = useRef<HTMLDivElement>(null);
   const start = useRef<{ x: number; y: number; dragging: boolean } | null>(null);
   const set = value != null;
   const f = set ? value! / 10 : 0.5;
 
+  const step = (d: number) => {
+    const v = Math.max(0, Math.min(10, (value ?? 5) + d));
+    if (v !== value) { onChange(v); navigator.vibrate?.(4); }
+  };
   function at(clientX: number) {
     const r = track.current!.getBoundingClientRect();
     const v = Math.round(Math.max(0, Math.min(1, (clientX - r.left - 14) / (r.width - 28))) * 10);
     if (v !== value) { onChange(v); navigator.vibrate?.(4); }
   }
   return (
-    <div
-      ref={track} class={'slider' + (set ? ' set' : '')}
-      role="slider" tabIndex={0} aria-label={label} aria-valuemin={0} aria-valuemax={10} aria-valuenow={value ?? undefined}
-      aria-valuetext={set ? `${value}, ${painWord(value!)}` : 'not rated'}
-      onKeyDown={(e) => {
-        if (e.key === 'ArrowRight' || e.key === 'ArrowUp') onChange(Math.min(10, (value ?? 4) + 1));
-        if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') onChange(Math.max(0, (value ?? 6) - 1));
-      }}
-      onPointerDown={(e) => { start.current = { x: e.clientX, y: e.clientY, dragging: false }; }}
-      onPointerMove={(e) => {
-        const s = start.current;
-        if (!s) return;
-        if (!s.dragging && Math.abs(e.clientX - s.x) > 6 && Math.abs(e.clientX - s.x) > Math.abs(e.clientY - s.y)) s.dragging = true;
-        if (s.dragging) at(e.clientX);
-      }}
-      onPointerUp={(e) => {
-        const s = start.current;
-        if (s && !s.dragging && Math.abs(e.clientX - s.x) < 8 && Math.abs(e.clientY - s.y) < 8) at(e.clientX);
-        start.current = null;
-      }}
-      onPointerCancel={() => { start.current = null; }}
-    >
-      <div class="slider-track">
-        <div class="slider-fill" style={{ clipPath: `inset(0 calc(100% - ${f} * (100% - 28px) - 14px) 0 0)` }} />
+    <div class="pain-adjust">
+      <button type="button" class="step-btn" aria-label={`Decrease ${label}`} disabled={value === 0} onClick={() => step(-1)}><IconMinus /></button>
+      <div
+        ref={track} class={'slider' + (set ? ' set' : '')}
+        role="slider" tabIndex={0} aria-label={label} aria-valuemin={0} aria-valuemax={10} aria-valuenow={value ?? undefined}
+        aria-valuetext={set ? `${value}, ${painWord(value!)}` : 'not rated'}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowRight' || e.key === 'ArrowUp') step(1);
+          if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') step(-1);
+        }}
+        onPointerDown={(e) => { start.current = { x: e.clientX, y: e.clientY, dragging: false }; }}
+        onPointerMove={(e) => {
+          const s = start.current;
+          if (!s) return;
+          if (!s.dragging && Math.abs(e.clientX - s.x) > 6 && Math.abs(e.clientX - s.x) > Math.abs(e.clientY - s.y)) s.dragging = true;
+          if (s.dragging) at(e.clientX);
+        }}
+        onPointerUp={(e) => {
+          const s = start.current;
+          if (s && !s.dragging && Math.abs(e.clientX - s.x) < 8 && Math.abs(e.clientY - s.y) < 8) at(e.clientX);
+          start.current = null;
+        }}
+        onPointerCancel={() => { start.current = null; }}
+      >
+        <div class="slider-track">
+          <div class="slider-fill" style={{ clipPath: `inset(0 calc(100% - ${f} * (100% - 28px) - 14px) 0 0)` }} />
+        </div>
+        <div class="slider-thumb" style={{ left: `calc(${f} * (100% - 28px))` }} />
       </div>
-      <div class="slider-thumb" style={{ left: `calc(${f} * (100% - 28px))` }} />
+      <button type="button" class="step-btn" aria-label={`Increase ${label}`} disabled={value === 10} onClick={() => step(1)}><IconPlus /></button>
     </div>
   );
 }

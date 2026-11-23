@@ -61,15 +61,32 @@ export function cardEntry(c: OtherCard, now: number, group?: string): PostureEnt
   };
 }
 
+/**
+ * iOS only opens the keyboard for a focus made during the tap itself, but the field a menu choice
+ * reveals only exists after the next render. Focusing a stand-in field during the tap opens the
+ * keyboard, and it stays open when TextRow then moves focus to the real field.
+ */
+export function primeKeyboard() {
+  const el = document.createElement('input');
+  el.setAttribute('aria-hidden', 'true');
+  el.style.cssText = 'position:fixed;top:40%;left:0;width:1px;height:1px;opacity:0;font-size:16px;border:0;padding:0';
+  document.body.appendChild(el);
+  el.focus({ preventScroll: true });
+  setTimeout(() => el.remove(), 1000);
+}
+
 /** Label on the left, a text field on the right, like an iOS form row. */
 export function TextRow({ label, value, onInput, onDone, placeholder, autoFocus }: {
   label: string; value: string; onInput: (v: string) => void; onDone?: () => void; placeholder?: string; autoFocus?: boolean;
 }) {
+  const input = useRef<HTMLInputElement>(null);
+  // autofocus only works on page load, so focus by hand when the row appears or is asked to.
+  useEffect(() => { if (autoFocus) input.current?.focus(); }, [autoFocus]);
   return (
     <label class="trow">
       <span class="mrow-label">{label}</span>
       <input
-        class="trow-input" value={value} placeholder={placeholder} autoFocus={autoFocus} autocomplete="off" enterkeyhint="done"
+        ref={input} class="trow-input" value={value} placeholder={placeholder} autocomplete="off" enterkeyhint="done"
         onInput={(e) => onInput((e.target as HTMLInputElement).value)}
         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onDone?.(); (e.target as HTMLInputElement).blur(); } }}
         onBlur={() => onDone?.()}
@@ -163,7 +180,7 @@ export function OtherCardView({ card, onChange, onRemove }: { card: OtherCard; o
       <CardShell kind="move" onRemove={onRemove}>
         <MenuRow
           label="What" placeholder="Choose" display={card.pick ? moveLabel(card.pick) : undefined} autoOpen={card.fresh && !card.pick}
-          items={items} value={card.pick ? [card.pick] : []} onChange={([pick]) => set({ pick })} onAction={() => setTyping(true)}
+          items={items} value={card.pick ? [card.pick] : []} onChange={([pick]) => set({ pick })} onAction={() => { primeKeyboard(); setTyping(true); }}
         />
         {typing && <TextRow label="Exercise" value={text} onInput={setText} onDone={commit} autoFocus />}
         {card.pick && (
@@ -188,14 +205,23 @@ export function OtherCardView({ card, onChange, onRemove }: { card: OtherCard; o
   };
   return (
     <CardShell kind="med" onRemove={onRemove}>
-      <MenuRow
-        label="Medication" placeholder="Choose" display={card.name} autoOpen={card.fresh && !card.name && meds.length > 0}
-        items={[...meds.map((t) => ({ v: t.name, label: t.dose ? `${t.name} · ${t.dose}` : t.name })), { v: 'new', label: 'New medication…', action: true }]}
-        value={card.name ? [card.name] : []}
-        onChange={([name]) => set({ name, dose: meds.find((t) => t.name === name)?.dose ?? '' })}
-        onAction={() => setTyping(true)}
-      />
-      {(typing || (!meds.length && !card.name)) && <TextRow label="Name" value={text} onInput={setText} onDone={commit} autoFocus={typing} />}
+      {!meds.length ? (
+        // Nothing saved yet, so there's nothing to pick: just type the name.
+        <TextRow
+          label="Medication" placeholder="Name" value={card.name ?? ''} autoFocus={card.fresh && !card.name}
+          onInput={(name) => set({ name: name || undefined })} onDone={() => set({ name: card.name?.trim() || undefined })}
+        />
+      ) : typing ? (
+        <TextRow label="Medication" placeholder="Name" value={text} onInput={setText} onDone={commit} autoFocus />
+      ) : (
+        <MenuRow
+          label="Medication" placeholder="Choose" display={card.name} autoOpen={card.fresh && !card.name}
+          items={[...meds.map((t) => ({ v: t.name, label: t.dose ? `${t.name} · ${t.dose}` : t.name })), { v: 'new', label: 'New medication…', action: true }]}
+          value={card.name ? [card.name] : []}
+          onChange={([name]) => set({ name, dose: meds.find((t) => t.name === name)?.dose ?? '' })}
+          onAction={() => { primeKeyboard(); setTyping(true); }}
+        />
+      )}
       {card.name && (
         <>
           <TextRow label="Dose" value={card.dose} onInput={(dose) => set({ dose })} />

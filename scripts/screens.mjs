@@ -125,8 +125,8 @@ await page.locator('.log-card').nth(1).evaluate((el) => el.scrollIntoView({ bloc
 await shot('07-checkin-regions', false);
 await centerClick('.add-item:has-text("medication for it")');
 await menuPick('New medication');
-await page.locator('.trow:has-text("Name") input').fill('Naproxen');
-await page.locator('.trow:has-text("Name") input').press('Enter');
+await page.locator('.log-card .trow:has-text("Medication") input').fill('Naproxen');
+await page.locator('.log-card .trow:has-text("Medication") input').press('Enter');
 await page.locator('.trow:has-text("Dose") input').fill('250 mg');
 await centerClick('.log-card:has-text("Naproxen") .mrow:has-text("Taken")'); await menuPick('1 h ago');
 await centerClick('.add-item:has-text("What I was doing")');

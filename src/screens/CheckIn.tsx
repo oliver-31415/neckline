@@ -9,7 +9,7 @@ import { BodyMap, SPINE, regionLabel, spineRangeLabel } from '../components/Body
 import { PainPill, PainSlider, Sheet, showToast } from '../components/ui';
 import { IconClose, IconDownChev, IconGear, IconPlus, IconUpChev, IconUpDown } from '../components/Icons';
 import { MenuButton, MenuRow } from '../components/Menu';
-import { CARD_STYLE, CardShell, OtherCardView, TextRow, WhenRow, cardEntry, cardReady, type CardKind, type OtherCard } from '../forms/LogCards';
+import { CARD_STYLE, CardShell, OtherCardView, TextRow, primeKeyboard, WhenRow, cardEntry, cardReady, type CardKind, type OtherCard } from '../forms/LogCards';
 
 /** A pain or symptom being logged. `when` null = now; `links` are spine ranges sharing one score (not saved). */
 type Draft = PainEntry & { levels: Record<string, number>; kinds: Record<string, Sensation[]>; when: number | null; links: string[][] };
@@ -153,11 +153,7 @@ function AreaEditor({ d, set }: { d: Draft; set: (p: Partial<Draft>) => void }) 
                   {label}<span class="group-count">{g.length}</span>
                 </button>
               ) : <span class="arow-label">{label}</span>}
-              <PainSlider value={d.levels[id]} onChange={(level) => setArea(id, { level })} label={label} />
-              <PainPill n={d.levels[id] ?? null} />
-              <button class="x-btn" aria-label={`Remove ${label}`} onClick={() => removeArea(id)}><IconClose /></button>
-            </div>
-            <div class="arow-line">
+              <span class="grow" />
               <FeelsLike value={d.kinds[id] ?? []} onChange={(kinds) => setArea(id, { kinds })} />
               {id.startsWith('spine-') && (
                 <span class="spine-step">
@@ -165,6 +161,11 @@ function AreaEditor({ d, set }: { d: Draft; set: (p: Partial<Draft>) => void }) 
                   <button class="x-btn" aria-label="One vertebra lower" onClick={() => moveSpine(g ?? [id], 1)}><IconDownChev /></button>
                 </span>
               )}
+              <button class="x-btn" aria-label={`Remove ${label}`} onClick={() => removeArea(id)}><IconClose /></button>
+            </div>
+            <div class="arow-line">
+              <PainSlider value={d.levels[id]} onChange={(level) => setArea(id, { level })} label={label} />
+              <PainPill n={d.levels[id] ?? null} />
             </div>
           </div>
         );
@@ -192,13 +193,13 @@ function SymptomRows({ d, set, autoOpen }: { d: Draft; set: (p: Partial<Draft>) 
       <MenuRow
         label="Symptoms" placeholder="Choose" multi autoOpen={autoOpen} display={d.symptoms.join(', ')}
         items={[...options.map((x) => ({ v: x, label: x })), { v: 'new', label: 'Something else…', action: true }]}
-        value={d.symptoms} onChange={choose} onAction={() => setTyping(true)}
+        value={d.symptoms} onChange={choose} onAction={() => { primeKeyboard(); setTyping(true); }}
       />
       {typing && <TextRow label="Symptom" value={text} onInput={setText} onDone={commit} autoFocus />}
       {d.symptoms.map((x) => (
         <div class="arow" key={x}>
+          <div class="arow-line"><span class="arow-label">{x}</span></div>
           <div class="arow-line">
-            <span class="arow-label">{x}</span>
             <PainSlider value={d.symptomLevels?.[x]} onChange={(v) => set({ symptomLevels: { ...d.symptomLevels, [x]: v } })} label={`${x} strength`} />
             <PainPill n={d.symptomLevels?.[x] ?? null} />
           </div>
@@ -314,6 +315,8 @@ function Home() {
 
   const add = (kind: CardKind) => {
     const c = newCard(kind);
+    // With no saved medications the card opens on a name field, so get the keyboard up during this tap.
+    if (kind === 'med' && !settings.value.treatments.some((t) => t.kind === 'medication')) primeKeyboard();
     if (cards.length) added.current = c.key;
     setCards([...cards, c]);
     navigator.vibrate?.(8);
