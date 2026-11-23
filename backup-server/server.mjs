@@ -21,7 +21,15 @@ const MAGIC = Buffer.from('NKB1'); // every backup the app makes starts with thi
 mkdirSync(DATA + 'users', { recursive: true, mode: 0o700 });
 const usersFile = DATA + 'users.json';
 /** @type {Record<string, { salt: string, hash: string, created: string }>} */
-let users = existsSync(usersFile) ? JSON.parse(readFileSync(usersFile, 'utf8')) : {};
+let users = {};
+let usersMtime = -1;
+// Re-read when add-user/remove-user change the file, so the running server needn't restart.
+function loadUsers() {
+  const m = existsSync(usersFile) ? statSync(usersFile).mtimeMs : 0;
+  if (m !== usersMtime) { users = m ? JSON.parse(readFileSync(usersFile, 'utf8')) : {}; usersMtime = m; }
+  return users;
+}
+loadUsers();
 const saveUsers = () => { writeFileSync(usersFile + '.tmp', JSON.stringify(users, null, 2), { mode: 0o600 }); renameSync(usersFile + '.tmp', usersFile); };
 const dirOf = (user) => DATA + 'users/' + user + '/';
 const validName = (n) => /^[a-z0-9_-]{1,32}$/.test(n);
@@ -61,7 +69,7 @@ function authenticate(req) {
   recentFailures = recentFailures.filter((t) => t > now - 60_000);
   if (recentFailures.length >= 30) return [429, 'too many attempts, try again later'];
 
-  const u = users[user] ?? DUMMY; // same work for unknown users, so names can't be probed by timing
+  const u = loadUsers()[user] ?? DUMMY; // same work for unknown users, so names can't be probed by timing
   const ok = timingSafeEqual(hashAuth(Buffer.from(token, 'base64url'), Buffer.from(u.salt, 'hex')), Buffer.from(u.hash, 'hex')) && u !== DUMMY;
   if (ok) { failures.delete(key); return user; }
 
