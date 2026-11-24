@@ -72,11 +72,6 @@ export function Settings() {
       <button class="back-btn" onClick={() => go('checkin')}><IconBack /> Check In</button>
       <Nav title="Settings" />
 
-      <Block title="You" flush>
-        <TextRow label="Name" placeholder="Optional" value={s.name} onInput={(name) => updateSettings({ name })} />
-        <DateRow label="Surgery date" value={s.surgeryDate} onChange={(surgeryDate) => updateSettings({ surgeryDate })} />
-      </Block>
-
       <Block title="Check-ins" flush foot={pushErr ? <span style={{ color: 'var(--danger)' }}>{pushErr}</span> : undefined}>
         <NavRow label="Times" value={s.checkinTimes.length ? s.checkinTimes.map(fmtSlot).join(', ') : 'None'} onClick={() => setOpen('times')} />
         <ToggleRow label="Reminders" sub={pushSub} checked={s.push.enabled} disabled={pushBusy || (!canPush && !s.push.enabled)} onChange={togglePush} />
@@ -104,6 +99,11 @@ export function Settings() {
           items={[{ v: 'system', label: 'Automatic' }, { v: 'light', label: 'Light' }, { v: 'dark', label: 'Dark' }]}
           value={[s.theme]} onChange={([theme]) => updateSettings({ theme: theme as S['theme'] })}
         />
+      </Block>
+
+      <Block title="Report" flush>
+        <TextRow label="Name" placeholder="Optional" value={s.name} onInput={(name) => updateSettings({ name })} />
+        <DateRow label="Surgery date" value={s.surgeryDate} onChange={(surgeryDate) => updateSettings({ surgeryDate })} />
       </Block>
 
       <Block title="This phone" aside={usage} flush>
