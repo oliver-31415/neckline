@@ -19,7 +19,7 @@ type Item =
   | { kind: 'user'; text: string }
   | { kind: 'text'; text: string }
   | { kind: 'tool'; id: string; name: string; label: string; input: unknown; state: 'running' | 'ok' | 'error'; output?: string }
-  | { kind: 'approval'; id: string; title: string; detail?: string; state: 'waiting' | 'allowed' | 'declined' }
+  | { kind: 'approval'; id: string; title: string; detail?: string; items?: { title: string; body: string }[]; allow?: string; allowed?: string; state: 'waiting' | 'allowed' | 'declined' }
   | { kind: 'file'; att: Attachment }
   | { kind: 'error'; text: string };
 
@@ -37,7 +37,7 @@ const ACTIONS = new Set(allTools().filter((t) => t.action).map((t) => t.name));
 
 /** Starter questions, chosen for the screen the chat was opened from. */
 const SUGGESTIONS: Record<Tab, string[]> = {
-  checkin: ['How has my pain been this week?', 'What seems to make my pain worse?', 'Has my medication seemed to help?', 'Write a report for my next appointment'],
+  checkin: ['Help me log how I’m feeling', 'How has my pain been this week?', 'What seems to make my pain worse?', 'Write a report for my next appointment'],
   history: ['What was my worst day lately, and what was different?', 'How did this week compare with last week?', 'When did I last take each medication?', 'Is my pain getting better overall?'],
   insights: ['What seems to make my pain worse?', 'Is anything linked to my headaches?', 'Is there a time of day my pain is worse?', 'Has my medication seemed to help?'],
   report: ['Write a report for my next appointment', 'What should I ask my surgeon about?', 'Sum up the last month in a few lines', 'How did this fortnight compare with the one before?'],
@@ -146,7 +146,7 @@ export function AssistantSheet() {
           <div ref={end} />
           <form class="chat-bar" onSubmit={(e) => { e.preventDefault(); submit(); }}>
             <textarea
-              class="chat-input" rows={1} placeholder="Ask about your diary" value={text}
+              class="chat-input" rows={1} placeholder="Ask, or tell me what to log" value={text}
               onInput={(e) => { const el = e.target as HTMLTextAreaElement; setText(el.value); el.style.height = 'auto'; el.style.height = `${Math.min(el.scrollHeight, 140)}px`; }}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }}
             />
@@ -220,12 +220,17 @@ function ApprovalCard({ it }: { it: Extract<Item, { kind: 'approval' }> }) {
     <div class={'approval ' + it.state}>
       <div class="approval-title">{it.title}</div>
       {it.detail && <div class="approval-detail">{it.detail}</div>}
+      {it.items && (
+        <div class="approval-items">
+          {it.items.map((x, k) => <div key={k}><div class="approval-item-title">{x.title}</div>{x.body && <div class="approval-item-body">{x.body}</div>}</div>)}
+        </div>
+      )}
       {it.state === 'waiting' ? (
         <div class="row">
           <button class="btn grow" onClick={() => answer(it.id, false)}>Don’t</button>
-          <button class="btn primary grow" onClick={() => answer(it.id, true)}>Allow</button>
+          <button class="btn primary grow" onClick={() => answer(it.id, true)}>{it.allow ?? 'Allow'}</button>
         </div>
-      ) : <div class="small muted">{it.state === 'allowed' ? 'Allowed' : 'Not allowed'}</div>}
+      ) : <div class="small muted">{it.state === 'allowed' ? it.allowed ?? 'Allowed' : 'Not done'}</div>}
     </div>
   );
 }

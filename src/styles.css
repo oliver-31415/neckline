@@ -594,6 +594,10 @@ textarea.input { min-height: 88px; resize: vertical; }
 .approval:not(.waiting) { border-color: transparent; }
 .approval-title { font-weight: 600; font-size: 16px; }
 .approval-detail { font-size: 14px; color: var(--ink-2); white-space: pre-wrap; max-height: 260px; overflow: auto; }
+.approval-items { display: flex; flex-direction: column; gap: 10px; max-height: 55vh; overflow: auto; }
+.approval-items > div + div { border-top: 0.5px solid var(--line); padding-top: 10px; }
+.approval-item-title { font-size: 13px; font-weight: 600; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.02em; }
+.approval-item-body { font-size: 15px; white-space: pre-wrap; margin-top: 2px; }
 .chat-file { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; background: var(--surface); border-radius: var(--r); padding: 12px; font-weight: 600; }
 .chat-file > .grow { flex-basis: 100%; }
 .chat-file > .btn { flex: 1; }

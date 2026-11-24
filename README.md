@@ -70,7 +70,14 @@ treatment summaries and a pain comparison over any time window, with no
 minimum number of readings; results come with counts and a rough interval.
 Photos, name and surgery date are never sent. Notes are sent only with
 "Share my notes" on. Each look-up appears as a chip that shows exactly what was
-sent. Actions (`create_report`, `add_question`) wait for an Allow tap. Form
+sent. Actions (`create_report`, `add_question`, `log_entries`) wait for an
+Allow tap.
+
+Telling it what happened ("neck's a 6 after driving, took my paracetamol") logs
+it (`src/ai/logging.ts`). It asks only for what's missing that matters (where
+and how bad, which medication), assumes the rest from the person's own lists
+and habits, and shows a card of exactly what will be saved. Save makes the same
+entries the Check In screen would, saved together with Undo. Form
 filling is set up in `src/ai/forms.ts` but switched off until a form and its
 review screen exist.
 

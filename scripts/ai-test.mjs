@@ -60,6 +60,60 @@ async function run(provider) {
   await ctx.close();
 }
 
+/** Logging from the chat: a bad call is rejected, the good one waits for Save, then lands like a check-in. */
+async function runLog(provider) {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  const page = await ctx.newPage();
+  page.on('pageerror', (e) => fail('page error ' + e.message));
+  await page.goto(BASE + '#/history');
+  await page.evaluate(async ({ provider, MOCK }) => {
+    const db = await new Promise((r) => { const q = indexedDB.open('neckline', 1); q.onupgradeneeded = () => { const d = q.result; d.createObjectStore('entries', { keyPath: 'id' }).createIndex('time', 'time'); d.createObjectStore('photos'); d.createObjectStore('kv'); }; q.onsuccess = () => r(q.result); });
+    const tx = db.transaction(['kv'], 'readwrite');
+    tx.objectStore('kv').put({ onboarded: true, version: 3, treatments: [{ name: 'Paracetamol', kind: 'medication', dose: '1 g' }], ai: { provider, keys: { [provider]: 'test-key-123' }, models: { other: 'mock-model-a' }, endpoints: { claude: MOCK, other: MOCK + '/v1' }, notes: false } }, 'settings');
+    await new Promise((r) => (tx.oncomplete = r));
+  }, { provider, MOCK });
+  await page.reload();
+  await page.waitForTimeout(700);
+  await page.getByRole('button', { name: 'Ask the assistant' }).click();
+  await page.locator('.chat-input').fill('LOG-TEST neck 6 after driving 90 min, took paracetamol');
+  await page.locator('.chat-send').click();
+  await page.locator('.approval.waiting').waitFor({ timeout: 15000 });
+  await page.screenshot({ path: `${SHOTS}/ai-04-log-${provider}.png` });
+  console.log(`[${provider}] log card:`, (await page.locator('.approval').innerText()).replace(/\n+/g, ' | '));
+  const before = await page.evaluate(() => new Promise((r) => { const q = indexedDB.open('neckline', 1); q.onsuccess = () => { const c = q.result.transaction('entries').objectStore('entries').count(); c.onsuccess = () => r(c.result); }; }));
+  if (before !== 0) fail('entries saved before Save was tapped');
+  await page.locator('.approval .btn.primary', { hasText: 'Save' }).click();
+  await page.locator('.bubble.ai', { hasText: 'Saved.' }).waitFor({ timeout: 15000 });
+  await page.screenshot({ path: `${SHOTS}/ai-05-logged-${provider}.png` });
+  const chips = await page.locator('.tool-chip').evaluateAll((els) => els.map((e) => `${e.textContent}:${e.className.replace('tool-chip ', '')}`));
+  console.log(`[${provider}] chips:`, chips.join(' | '));
+  if (!chips.some((c) => c.startsWith('Log 1 entry:error'))) fail('the bad log call was not rejected');
+  const { list, settings } = await page.evaluate(() => new Promise((r) => { const q = indexedDB.open('neckline', 1); q.onsuccess = () => {
+    const tx = q.result.transaction(['entries', 'kv']); const a = tx.objectStore('entries').getAll(); const b = tx.objectStore('kv').get('settings');
+    tx.oncomplete = () => r({ list: a.result, settings: b.result });
+  }; }));
+  const by = (t) => list.filter((e) => e.type === t);
+  const pain = by('pain').find((e) => Object.keys(e.regions).length);
+  const sym = by('pain').find((e) => !Object.keys(e.regions).length);
+  const med = by('treatment')[0], post = by('posture')[0], day = by('day')[0];
+  const check = (ok, m) => (ok ? console.log(`[${provider}] ok:`, m) : fail(`[${provider}] ${m}`));
+  check(list.length === 5, `5 entries saved (${list.length})`);
+  check(pain && Object.keys(pain.regions).sort().join() === 'forearm-R,spine-C4,spine-C5,spine-C6' && pain.intensity === 6 && pain.levels['spine-C5'] === 6 && pain.kinds['forearm-R'][0] === 'tingling' && pain.duration === '1 h' && pain.impacts.sleep === 1, 'pain areas, levels, feel, lasted, impact');
+  check(sym && sym.symptoms.join() === 'Headache,Ear ringing' && sym.symptomLevels.Headache === 3 && sym.intensity === null, 'symptom names matched, strength kept');
+  check(med && med.name === 'Paracetamol' && med.kind === 'medication' && med.dose === '1 g', 'medication matched to saved name');
+  check(post && post.posture === 'car' && post.minutes === 90 && Math.abs(Date.now() - post.time - 90 * 60e3) < 5 * 60e3, 'posture starts 90 min ago');
+  check(day && day.sleepHours === 6 && day.sleepQuality === 'poor' && !day.group, 'sleep & day');
+  check(new Set([pain, sym, med, post].map((e) => e?.group)).size === 1 && pain?.group, 'saved together as one group');
+  check(settings.symptoms.includes('Ear ringing'), 'new symptom remembered');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await page.waitForTimeout(400);
+  const after = await page.evaluate(() => new Promise((r) => { const q = indexedDB.open('neckline', 1); q.onsuccess = () => { const c = q.result.transaction('entries').objectStore('entries').count(); c.onsuccess = () => r(c.result); }; }));
+  check(after === 0, `Undo removes them (${after} left)`);
+  await ctx.close();
+}
+
 await run('claude');
 await run('other');
+await runLog('claude');
+await runLog('other');
 await browser.close();

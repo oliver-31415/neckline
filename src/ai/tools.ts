@@ -6,10 +6,11 @@ import { REGION_LABELS, SENSATION_LABEL, regionLabel } from '../components/BodyM
 import type { Entry, PainEntry } from '../lib/types';
 import { DATE, type ObjectSchema } from './schema';
 import { formTools } from './forms';
+import { logTools } from './logging';
 
 /*
  * What the assistant can do. Read tools look things up; action tools change something or make a
- * file, and only run after the person taps Allow. Every input is validated before run() (see
+ * file (logging entries is in logging.ts), and only run after the person taps Allow. Every input is validated before run() (see
  * schema.ts), and results are trimmed to what's needed: no photos, no name or surgery date, and
  * notes only when "Share my notes" is on.
  */
@@ -18,8 +19,8 @@ export interface Attachment { kind: 'pdf'; file: File; label: string }
 
 export interface ToolContext {
   notes: boolean;
-  /** Shows an Allow / Don't card in the chat and waits for the answer. */
-  approve: (req: { title: string; detail?: string }) => Promise<boolean>;
+  /** Shows an Allow / Don't card in the chat and waits for the answer. `items` lists things one by one; `allow` renames the button, `allowed` the result. */
+  approve: (req: { title: string; detail?: string; items?: { title: string; body: string }[]; allow?: string; allowed?: string }) => Promise<boolean>;
   attach: (a: Attachment) => void;
 }
 
@@ -330,7 +331,7 @@ const addQuestion: AiTool = {
 };
 
 export function allTools(): AiTool[] {
-  return [getOverview, getEntries, getDaily, listFactors, comparePain, getTreatments, createReport, addQuestion, ...formTools()];
+  return [getOverview, getEntries, getDaily, listFactors, comparePain, getTreatments, ...logTools(), createReport, addQuestion, ...formTools()];
 }
 
 /** Finds a tool by name, forgiving letter case (models occasionally vary it). */
