@@ -2,28 +2,42 @@ import { useEffect, useState } from 'preact/hooks';
 import { settings, updateSettings, wipe, entries, persisted, keepData } from '../lib/store';
 import { ServerBackup } from './ServerBackup';
 import { go } from '../lib/nav';
-import { POSTURES, STEPS } from '../lib/catalog';
+import { MAIN_SYMPTOMS, POSTURES } from '../lib/catalog';
 import { fmtSlot } from '../lib/time';
-import { Block, Chips, Nav, Seg, Toggle, showToast } from '../components/ui';
-import { IconBack, IconBell, IconDownload, IconLock, IconTrash, IconUpload } from '../components/Icons';
+import { Block, Nav, Sheet, showToast } from '../components/ui';
+import { MenuButton, MenuRow } from '../components/Menu';
+import { ActionRow, DateRow, ListEditor, NavRow, ToggleRow, ValueRow } from '../components/rows';
+import { IconBack, IconClose } from '../components/Icons';
+import { TextRow } from '../forms/LogCards';
 import { disablePush, enablePush, pushReady, pushSupported, syncSchedule, testPush } from '../lib/push';
 import { makeBackup, restoreBackup } from '../export/backup';
 import { shareOrDownload } from '../export/files';
 import { isStandalone } from '../lib/env';
 import type { Settings as S } from '../lib/types';
 
-type ListKey = 'qualities' | 'symptoms' | 'activities' | 'exercises' | 'mealTags' | 'sideEffects';
+type ListKey = 'exercises' | 'symptoms' | 'activities' | 'mealTags' | 'sideEffects';
+type Open = null | 'times' | 'postures' | 'meds' | ListKey;
+
+const LISTS: { k: ListKey; label: string; add: string }[] = [
+  { k: 'exercises', label: 'Exercises', add: 'New exercise' },
+  { k: 'symptoms', label: 'Symptoms', add: 'New symptom' },
+  { k: 'activities', label: 'Activities', add: 'New activity' },
+  { k: 'mealTags', label: 'Food tags', add: 'New tag' },
+  { k: 'sideEffects', label: 'Side effects', add: 'New side effect' },
+];
+
+/** Headache and migraine are always offered, so they aren't listed for removal. */
+const editable = (k: ListKey, list: string[]) => (k === 'symptoms' ? list.filter((x) => !MAIN_SYMPTOMS.includes(x)) : list);
 
 export function Settings() {
   const s = settings.value;
-  const [newTime, setNewTime] = useState('12:00');
+  const [open, setOpen] = useState<Open>(null);
   const [pushBusy, setPushBusy] = useState(false);
   const [pushErr, setPushErr] = useState('');
-  const [withPhotos, setWithPhotos] = useState(true);
   const [usage, setUsage] = useState('');
 
   useEffect(() => {
-    navigator.storage?.estimate?.().then((e) => e.usage != null && setUsage(`${(e.usage / 1024 / 1024).toFixed(1)} MB used on this phone`));
+    navigator.storage?.estimate?.().then((e) => e.usage != null && setUsage(`${(e.usage / 1024 / 1024).toFixed(1)} MB`));
   }, [entries.value.length]);
 
   async function setTimes(checkinTimes: string[]) {
@@ -36,7 +50,6 @@ export function Settings() {
     setPushBusy(true);
     try {
       if (on) {
-        if (!pushReady()) throw new Error('Sign in to your Neckline server below first.');
         await enablePush(s.checkinTimes);
         showToast('Reminders on');
       } else {
@@ -50,99 +63,65 @@ export function Settings() {
     }
   }
 
-  const removeFrom = (k: ListKey, v: string) => updateSettings({ [k]: s[k].filter((x) => x !== v) } as Partial<S>);
-  const addTo = (k: ListKey, v: string) => !s[k].includes(v) && updateSettings({ [k]: [...s[k], v] } as Partial<S>);
+  const canPush = pushSupported() && isStandalone() && pushReady();
+  const pushSub = !pushSupported() || !isStandalone() ? 'Home Screen app only' : !pushReady() ? 'Sign in to your server first' : undefined;
+  const meds = s.treatments;
 
   return (
     <div class="screen">
       <button class="back-btn" onClick={() => go('checkin')}><IconBack /> Check In</button>
       <Nav title="Settings" />
 
-      <Block title="About you">
-        <label class="field"><span>Name</span><input class="input" value={s.name} onChange={(e) => updateSettings({ name: (e.target as HTMLInputElement).value })} /></label>
-        <label class="field"><span>Surgery date</span><input type="date" class="input" value={s.surgeryDate} onChange={(e) => updateSettings({ surgeryDate: (e.target as HTMLInputElement).value })} /></label>
+      <Block title="You" flush>
+        <TextRow label="Name" placeholder="Optional" value={s.name} onInput={(name) => updateSettings({ name })} />
+        <DateRow label="Surgery date" value={s.surgeryDate} onChange={(surgeryDate) => updateSettings({ surgeryDate })} />
       </Block>
 
-      <Block title="Check-in times">
-        <div class="chips">
-          {s.checkinTimes.map((t) => (
-            <button key={t} class="chip" onClick={() => setTimes(s.checkinTimes.filter((x) => x !== t))}>{fmtSlot(t)} <span class="muted">×</span></button>
-          ))}
-        </div>
-        <div class="row">
-          <input type="time" class="input" style={{ width: 140 }} value={newTime} onChange={(e) => setNewTime((e.target as HTMLInputElement).value)} />
-          <button class="btn" onClick={() => newTime && setTimes([...s.checkinTimes, newTime])}>Add time</button>
-        </div>
-      </Block>
-
-      <Block title="Reminders">
-        <div class="row">
-          <span style={{ width: 22, height: 22, color: 'var(--accent)' }}><IconBell /></span>
-          <div class="grow">
-            <div style={{ fontWeight: 600 }}>Notify me at check-in times</div>
-            <div class="small muted">{!pushSupported() || !isStandalone() ? 'Home Screen app only' : !pushReady() ? 'Sign in to your server below' : s.push.enabled ? 'On' : 'Off'}</div>
-          </div>
-          <Toggle checked={s.push.enabled} label="Reminders" onChange={(v) => !pushBusy && togglePush(v)} />
-        </div>
-        {s.push.enabled && <button class="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => testPush().then(() => showToast('Test sent')).catch((e) => setPushErr(e.message))}>Send a test reminder</button>}
-        {pushErr && <div class="small" style={{ color: 'var(--danger)' }}>{pushErr}</div>}
+      <Block title="Check-ins" flush foot={pushErr ? <span style={{ color: 'var(--danger)' }}>{pushErr}</span> : undefined}>
+        <NavRow label="Times" value={s.checkinTimes.length ? s.checkinTimes.map(fmtSlot).join(', ') : 'None'} onClick={() => setOpen('times')} />
+        <ToggleRow label="Reminders" sub={pushSub} checked={s.push.enabled} disabled={pushBusy || (!canPush && !s.push.enabled)} onChange={togglePush} />
+        {s.push.enabled && <ActionRow label="Send a test reminder" onClick={() => testPush().then(() => showToast('Test sent')).catch((e) => setPushErr(e.message))} />}
       </Block>
 
       <ServerBackup />
 
-      <Block title="Check-in questions">
-        {STEPS.map((st) => (
-          <div class="row between" key={st.id}>
-            <div><div style={{ fontWeight: 600 }}>{st.label}</div>{st.hint && <div class="small muted">{st.hint}</div>}</div>
-            <Toggle checked={s.steps[st.id]} label={st.label} onChange={(v) => updateSettings({ steps: { ...s.steps, [st.id]: v } })} />
-          </div>
-        ))}
+      <Block title="Lists" flush>
+        <NavRow label="Postures" value={`${s.postures.length} of ${Object.keys(POSTURES).length}`} onClick={() => setOpen('postures')} />
+        {LISTS.slice(0, 2).map(({ k, label }) => <NavRow key={k} label={label} value={editable(k, s[k]).length} onClick={() => setOpen(k)} />)}
+        <NavRow label="Medications" value={meds.length} onClick={() => setOpen('meds')} />
+        {LISTS.slice(2).map(({ k, label }) => <NavRow key={k} label={label} value={s[k].length} onClick={() => setOpen(k)} />)}
       </Block>
 
-      <Block title="Postures to show">
-        <Chips options={Object.keys(POSTURES)} labels={Object.fromEntries(Object.entries(POSTURES).map(([k, v]) => [k, v.label]))} value={s.postures} onChange={(postures) => updateSettings({ postures: Object.keys(POSTURES).filter((k) => postures.includes(k)) })} />
+      <Block title="Pain and symptom rows" flush>
+        <ToggleRow label="Lasted" checked={s.steps.duration} onChange={(v) => updateSettings({ steps: { ...s.steps, duration: v } })} />
+        <ToggleRow label="Got in the way of" checked={s.steps.impact} onChange={(v) => updateSettings({ steps: { ...s.steps, impact: v } })} />
+        <ToggleRow label="Note" checked={s.steps.note} onChange={(v) => updateSettings({ steps: { ...s.steps, note: v } })} />
       </Block>
 
-      {([
-        ['qualities', 'Pain descriptions'],
-        ['symptoms', 'Other symptoms'],
-        ['activities', 'Activities'],
-        ['exercises', 'Exercises'],
-        ['mealTags', 'Food tags'],
-        ['sideEffects', 'Side effects'],
-      ] as [ListKey, string][]).map(([k, label]) => (
-        <Block key={k} title={label}>
-          <div class="chips">
-            {s[k].map((v) => <button key={v} class="chip" onClick={() => removeFrom(k, v)}>{v} <span class="muted">×</span></button>)}
-            <AddChip onAdd={(v) => addTo(k, v)} />
-          </div>
-        </Block>
-      ))}
-
-      {s.treatments.length > 0 && (
-        <Block title="Saved treatments">
-          <div class="chips">
-            {s.treatments.map((t) => <button key={t.name} class="chip" onClick={() => updateSettings({ treatments: s.treatments.filter((x) => x !== t) })}>{t.name}{t.dose ? ` · ${t.dose}` : ''} <span class="muted">×</span></button>)}
-          </div>
-        </Block>
-      )}
-
-      <Block title="Appearance">
-        <Seg options={[{ v: 'system', label: 'Automatic' }, { v: 'light', label: 'Light' }, { v: 'dark', label: 'Dark' }]} value={s.theme} onChange={(theme) => updateSettings({ theme: theme ?? 'system' })} />
+      <Block title="Appearance" flush>
+        <MenuRow
+          label="Theme" display={{ system: 'Automatic', light: 'Light', dark: 'Dark' }[s.theme]}
+          items={[{ v: 'system', label: 'Automatic' }, { v: 'light', label: 'Light' }, { v: 'dark', label: 'Dark' }]}
+          value={[s.theme]} onChange={([theme]) => updateSettings({ theme: theme as S['theme'] })}
+        />
       </Block>
 
-      <Block title="Your data" aside={usage}>
-        <div class="row between">
-          <span>Kept on this phone</span>
+      <Block title="This phone" aside={usage} flush>
+        <ValueRow label="Storage">
           {persisted.value
-            ? <span style={{ color: 'var(--good)', fontWeight: 600 }}>Protected</span>
+            ? <span class="set-value good">Protected</span>
             : <button class="btn sm" onClick={async () => !(await keepData()) && showToast(isStandalone() ? 'iOS didn’t allow it yet' : 'Open from the Home Screen icon')}>Protect</button>}
-        </div>
-        <div class="row between"><span>Include meal photos</span><Toggle checked={withPhotos} label="Include meal photos" onChange={setWithPhotos} /></div>
-        <button class="btn wide" onClick={async () => shareOrDownload(await makeBackup(withPhotos))}><IconDownload /> Save a backup file</button>
-        <label class="btn wide" style={{ position: 'relative' }}>
-          <IconUpload /> Restore from a backup
-          <input type="file" accept="application/json,.json" style={{ position: 'absolute', inset: 0, opacity: 0 }} onChange={async (e) => {
+        </ValueRow>
+        <MenuButton
+          class="set-row tap action" label="Save a backup file" value={[]}
+          items={[{ v: 'photos', label: 'With meal photos' }, { v: 'plain', label: 'Without photos' }]}
+          onChange={async ([v]) => shareOrDownload(await makeBackup(v === 'photos'))}
+        >
+          <span>Save a backup file…</span>
+        </MenuButton>
+        <label class="set-row tap action">
+          <span>Restore from a file…</span>
+          <input type="file" accept="application/json,.json" class="file-cover" onChange={async (e) => {
             const f = (e.target as HTMLInputElement).files?.[0];
             if (!f) return;
             try {
@@ -152,22 +131,60 @@ export function Settings() {
             (e.target as HTMLInputElement).value = '';
           }} />
         </label>
-        <button class="btn danger wide" onClick={async () => {
+        <ActionRow label="Delete everything" danger onClick={async () => {
           if (confirm('Delete every entry, photo and setting from this phone? This can’t be undone.') && confirm('Are you sure? Consider saving a backup first.')) {
             await wipe();
             showToast('All data deleted');
           }
-        }}><IconTrash /> Delete everything</button>
+        }} />
       </Block>
 
+      {open === 'times' && <TimesSheet times={s.checkinTimes} onChange={setTimes} onClose={() => setOpen(null)} />}
+      {open === 'postures' && (
+        <Sheet title="Postures" onClose={() => setOpen(null)}>
+          <div class="group">
+            {Object.entries(POSTURES).map(([k, p]) => (
+              <ToggleRow key={k} label={p.label} checked={s.postures.includes(k)} onChange={(v) => updateSettings({ postures: Object.keys(POSTURES).filter((x) => (x === k ? v : s.postures.includes(x))) })} />
+            ))}
+          </div>
+        </Sheet>
+      )}
+      {open === 'meds' && (
+        <Sheet title="Medications" onClose={() => setOpen(null)}>
+          {meds.length
+            ? <ListEditor items={meds.map((t) => t.name)} label={(n) => { const t = meds.find((x) => x.name === n); return t?.dose ? `${n} · ${t.dose}` : n; }} onRemove={(n) => updateSettings({ treatments: s.treatments.filter((t) => t.name !== n) })} />
+            : <div class="group"><ValueRow label="None yet" /></div>}
+        </Sheet>
+      )}
+      {LISTS.map(({ k, label, add }) => open === k && (
+        <Sheet key={k} title={label} onClose={() => setOpen(null)}>
+          <ListEditor
+            items={editable(k, s[k])} addLabel={add}
+            onRemove={(v) => updateSettings({ [k]: settings.value[k].filter((x) => x !== v) } as Partial<S>)}
+            onAdd={(v) => !settings.value[k].includes(v) && updateSettings({ [k]: [...settings.value[k], v] } as Partial<S>)}
+          />
+        </Sheet>
+      ))}
     </div>
   );
 }
 
-function AddChip({ onAdd }: { onAdd: (v: string) => void }) {
-  const [v, setV] = useState('');
-  const [open, setOpen] = useState(false);
-  if (!open) return <button class="chip add" onClick={() => setOpen(true)}>+ Add</button>;
-  const done = () => { if (v.trim()) onAdd(v.trim()); setV(''); setOpen(false); };
-  return <input class="input" autoFocus style={{ width: 160, minHeight: 40, padding: '7px 12px', borderRadius: 999 }} value={v} onInput={(e) => setV((e.target as HTMLInputElement).value)} onKeyDown={(e) => e.key === 'Enter' && done()} onBlur={done} />;
+function TimesSheet({ times, onChange, onClose }: { times: string[]; onChange: (t: string[]) => void; onClose: () => void }) {
+  const [next, setNext] = useState('12:00');
+  return (
+    <Sheet title="Check-in times" onClose={onClose}>
+      <div class="group">
+        {times.map((t) => (
+          <div class="set-row" key={t}>
+            <span class="set-text"><span>{fmtSlot(t)}</span></span>
+            <button type="button" class="x-btn" aria-label={`Remove ${fmtSlot(t)}`} onClick={() => onChange(times.filter((x) => x !== t))}><IconClose /></button>
+          </div>
+        ))}
+        <div class="set-row">
+          <input type="time" class="trow-input left" aria-label="New time" value={next} onChange={(e) => setNext((e.target as HTMLInputElement).value)} />
+          <button type="button" class="btn sm" disabled={!next || times.includes(next)} onClick={() => onChange([...times, next])}>Add</button>
+        </div>
+      </div>
+    </Sheet>
+  );
 }

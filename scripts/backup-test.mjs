@@ -24,20 +24,22 @@ await page.reload();
 await page.waitForTimeout(600);
 
 // Wrong password first.
-const form = page.locator('form.col-form');
+await page.getByRole('button', { name: /^Sign in/ }).click();
+const form = page.locator('.sheet form');
+const submit = () => page.locator('.sheet-head .bar-btn.strong').click();
 await form.locator('input[type=url]').fill(SERVER);
 await form.locator('input[autocomplete=username]').fill('Tester');
 await form.locator('input[type=password]').fill('wrong password!');
-await form.locator('button').click();
+await submit();
 await page.getByText('Wrong user name or password.').waitFor({ timeout: 15000 });
 console.log('wrong password rejected');
 
 await form.locator('input[type=password]').fill('correct horse battery');
-await form.locator('button').click();
+await submit();
 await page.getByText('Last backup').waitFor({ timeout: 15000 });
 await page.waitForFunction(() => !document.body.innerText.includes('Not yet') && !document.body.innerText.includes('Backing up'), null, { timeout: 15000 });
-console.log('signed in; status:', await page.locator('.section', { hasText: 'Neckline server' }).innerText());
-await page.locator('.section', { hasText: 'Neckline server' }).screenshot({ path: 'shots/backup-block.png' });
+console.log('signed in; status:', await page.locator('.section', { hasText: 'Signed in as' }).innerText());
+await page.locator('.section', { hasText: 'Signed in as' }).screenshot({ path: 'shots/backup-block.png' });
 
 // Stored settings never contain the password; the uploaded file is ciphertext.
 const stored = await page.evaluate(async () => {
@@ -63,11 +65,11 @@ await page.evaluate(async () => { await new Promise((r) => { const q = indexedDB
 await page.goto(BASE + '#/settings');
 await page.reload();
 await page.waitForTimeout(800);
-const form2 = page.locator('form.col-form');
-await form2.locator('input[type=url]').fill(SERVER);
-await form2.locator('input[autocomplete=username]').fill('tester');
-await form2.locator('input[type=password]').fill('correct horse battery');
-await form2.locator('button').click();
+await page.getByRole('button', { name: /^Sign in/ }).click();
+await form.locator('input[type=url]').fill(SERVER);
+await form.locator('input[autocomplete=username]').fill('tester');
+await form.locator('input[type=password]').fill('correct horse battery');
+await submit();
 await page.getByText('Restored 1 entries').waitFor({ timeout: 20000 });
 const back = await page.evaluate(async () => {
   const db = await new Promise((r) => { const q = indexedDB.open('neckline', 1); q.onsuccess = () => r(q.result); });

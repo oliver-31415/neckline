@@ -530,3 +530,21 @@ textarea.input { min-height: 88px; resize: vertical; }
 .arow .arow-line:first-child .arow-label { flex: 0 1 auto; }
 .arow .arow-line:first-child .feels { flex: 0 1 auto; }
 .arow .arow-line + .arow-line { gap: 8px; margin-top: 2px; }
+
+/* Settings rows (iOS grouped list) */
+.set-row {
+  width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 14px 10px 16px; min-height: 48px;
+  background: none; border: 0; text-align: left; font: inherit; font-size: 17px; color: var(--ink); position: relative;
+}
+.set-row.tap { cursor: pointer; }
+.set-row.tap:active:not(:disabled) { background: var(--fill); }
+.set-row.action { color: var(--accent); }
+.set-row.danger { color: var(--danger); }
+.set-row:disabled, .set-row.dim { opacity: 0.45; }
+.set-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.set-sub { font-size: 13px; color: var(--muted); }
+.set-value { flex: none; max-width: 60%; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.set-value.good { color: var(--good); font-weight: 600; }
+.set-icon { display: grid; place-items: center; width: 22px; height: 22px; }
+.file-cover { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; }
+.trow-input.left { text-align: left; flex: 1; }

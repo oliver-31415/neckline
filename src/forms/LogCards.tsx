@@ -88,7 +88,8 @@ export function TextRow({ label, value, onInput, onDone, placeholder, autoFocus 
       <input
         ref={input} class="trow-input" value={value} placeholder={placeholder} autocomplete="off" enterkeyhint="done"
         onInput={(e) => onInput((e.target as HTMLInputElement).value)}
-        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onDone?.(); (e.target as HTMLInputElement).blur(); } }}
+        // Enter just leaves the field; onBlur then finishes it, so it runs once.
+        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLInputElement).blur(); } }}
         onBlur={() => onDone?.()}
       />
     </label>
