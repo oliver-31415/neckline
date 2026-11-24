@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { settings, updateSettings, wipe, entries, persisted, keepData } from '../lib/store';
 import { ServerBackup } from './ServerBackup';
+import { AiSettings } from './AiSettings';
 import { go } from '../lib/nav';
 import { MAIN_SYMPTOMS, POSTURES } from '../lib/catalog';
 import { fmtSlot } from '../lib/time';
@@ -79,6 +80,8 @@ export function Settings() {
       </Block>
 
       <ServerBackup />
+
+      <AiSettings />
 
       <Block title="Lists" flush>
         <NavRow label="Postures" value={`${s.postures.length} of ${Object.keys(POSTURES).length}`} onClick={() => setOpen('postures')} />

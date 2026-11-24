@@ -14,9 +14,9 @@ export interface Backup {
 
 const toDataUrl = (b: Blob) => new Promise<string>((r) => { const f = new FileReader(); f.onload = () => r(f.result as string); f.readAsDataURL(b); });
 
-/** Settings as they go into a backup: without the server sign-in or backup bookkeeping (which would make every backup look like a change). */
+/** Settings as they go into a backup: without the server sign-in, AI keys, or backup bookkeeping (which would make every backup look like a change). */
 export function shareableSettings(s: Settings = settings.value): Settings {
-  return { ...s, backup: { ...s.backup, auth: '', key: '', lastAt: null, lastHash: '' } };
+  return { ...s, backup: { ...s.backup, auth: '', key: '', lastAt: null, lastHash: '' }, ai: { ...s.ai, keys: {} } };
 }
 
 export async function backupData(withPhotos: boolean): Promise<Backup> {
@@ -36,8 +36,8 @@ export async function makeBackup(withPhotos: boolean): Promise<File> {
 export async function applyBackup(data: Backup, restoreSettings: boolean) {
   if (data?.app !== 'neckline' || !Array.isArray(data.entries)) throw new Error('This doesn’t look like a Neckline backup.');
   for (const [id, url] of Object.entries(data.photos ?? {})) await putPhoto(id, await (await fetch(url)).blob());
-  // This phone's backup sign-in always stays as it is.
-  await replaceAll(data.entries, restoreSettings ? { ...data.settings, backup: settings.value.backup } : null);
+  // This phone's backup sign-in and AI keys always stay as they are.
+  await replaceAll(data.entries, restoreSettings ? { ...data.settings, backup: settings.value.backup, ai: { ...data.settings.ai, keys: settings.value.ai.keys } } : null);
   return data.entries.length;
 }
 

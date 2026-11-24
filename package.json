@@ -13,10 +13,12 @@
   "keywords": [],
   "type": "module",
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.13.0",
     "@preact/signals": "^2.11.4",
     "idb": "^8.0.4",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.9",
+    "openai": "^7.63.0",
     "preact": "^11.2.0"
   },
   "devDependencies": {

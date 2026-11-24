@@ -115,6 +115,7 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
   push: { enabled: false },
   backup: { serverUrl: DEFAULT_SERVER, user: '', auth: '', key: '', auto: true, lastAt: null, lastHash: '' },
+  ai: { provider: 'claude', keys: {}, models: {}, endpoints: {}, notes: false },
   onboarded: false,
   version: 3,
 };

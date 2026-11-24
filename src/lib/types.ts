@@ -109,6 +109,8 @@ export interface Settings {
   push: { enabled: boolean };
   /** Your Neckline server (backups and reminders). auth signs in; key encrypts backups and never leaves the phone. */
   backup: { serverUrl: string; user: string; auth: string; key: string; auto: boolean; lastAt: number | null; lastHash: string };
+  /** The assistant: which AI service, and per service the key, model and address. Keys stay on this phone. */
+  ai: { provider: 'claude' | 'openai' | 'openrouter' | 'other'; keys: Record<string, string>; models: Record<string, string>; endpoints: Record<string, string>; notes: boolean };
   onboarded: boolean;
   /** Bumped when default lists change, so stored settings can be upgraded once. */
   version?: number;

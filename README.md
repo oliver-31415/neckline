@@ -8,8 +8,8 @@ It doesn't diagnose anything.
 - **Local only.** Entries and meal photos live in the phone's IndexedDB, and
   the app asks the browser to keep them permanently (persistent storage). No
   analytics, and no network calls apart from one optional server you run
-  yourself. It sends check-in reminders, knowing only your times, and keeps
-  encrypted backups it can't read.
+  yourself and the optional assistant. The server sends check-in reminders,
+  knowing only your times, and keeps encrypted backups it can't read.
 - **Opens on the check-in.** One overall pain slider, a body diagram you tap,
   and a slider for each marked area. Everything else (what it feels like,
   duration, impact, symptoms, what you were doing, a note) sits in optional rows
@@ -56,6 +56,26 @@ never leaves the phone.
 On the iPhone: open the URL in Safari → Share → **Add to Home Screen**, and
 always open it from that icon. A Home Screen app has its own storage, separate
 from Safari tabs.
+
+## Assistant (optional)
+
+Settings → Assistant takes an API key for Claude (default model
+`claude-sonnet-5-5`), OpenAI, OpenRouter or any OpenAI-compatible service. The
+phone talks to that service directly, and the key stays on the phone. Backups
+never include it.
+
+The assistant gets read-only tools (`src/ai/tools.ts`) rather than the
+database. It can see an overview, entries in a date range, daily summaries,
+treatment summaries and a pain comparison over any time window, with no
+minimum number of readings; results come with counts and a rough interval.
+Photos, name and surgery date are never sent. Notes are sent only with
+"Share my notes" on. Each look-up appears as a chip that shows exactly what was
+sent. Actions (`create_report`, `add_question`) wait for an Allow tap. Form
+filling is set up in `src/ai/forms.ts` but switched off until a form and its
+review screen exist.
+
+`node scripts/mock-ai.mjs & npx vite preview --port 4173 & node scripts/ai-test.mjs`
+runs the whole flow against a local stand-in for both APIs.
 
 ## Reminders and backups (optional)
 

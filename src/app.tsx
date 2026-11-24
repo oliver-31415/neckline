@@ -12,6 +12,7 @@ import { Sheet, Toast, showToast } from './components/ui';
 import { IconClock, IconPatterns, IconPulse, IconReport } from './components/Icons';
 import { TYPE_STYLE } from './components/EntryRow';
 import type { ActivityEntry, DayEntry, MealEntry, PainEntry, PostureEntry, TreatmentEntry } from './lib/types';
+import { AssistantSheet } from './screens/Assistant';
 
 effect(() => {
   const t = settings.value.theme;
@@ -61,6 +62,7 @@ export function App() {
       </nav>
 
       <ActiveSheet />
+      <AssistantSheet />
       <Toast />
     </div>
   );

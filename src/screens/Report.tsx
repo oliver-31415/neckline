@@ -3,9 +3,10 @@ import { entries, settings, uid, updateSettings } from '../lib/store';
 import { DAY, dayKey, fmtDay, fromDayKey, startOfDay } from '../lib/time';
 import { fmt1, inRange, summary } from '../lib/analysis';
 import { Block, Nav, Toggle, showToast } from '../components/ui';
-import { IconCheck, IconDownload, IconReport, IconShare, IconTrash } from '../components/Icons';
+import { IconCheck, IconDownload, IconReport, IconShare, IconSpark, IconTrash } from '../components/Icons';
 import { entriesCsv } from '../export/csv';
 import { shareOrDownload } from '../export/files';
+import { openAssistant } from './Assistant';
 
 type Preset = 'since' | '14' | '30' | '90' | 'custom';
 
@@ -81,6 +82,9 @@ export function Report() {
             <button class="link small" onClick={() => setPdf(null)}>Make a different one</button>
           </div>
         )}
+        <button class="ask-btn" disabled={count === 0} onClick={() => openAssistant(`Help me write a report for my appointment, covering ${fmtDay(from, { day: 'numeric', month: 'short' })} to ${fmtDay(to - 1, { day: 'numeric', month: 'short' })}.`)}>
+          <IconSpark /> Write it with the assistant
+        </button>
         <button class="btn wide" disabled={count === 0} onClick={() => shareOrDownload(entriesCsv(inRange(entries.value, from, to)))}>
           <IconDownload /> Spreadsheet (CSV)
         </button>

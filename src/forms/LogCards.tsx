@@ -76,8 +76,8 @@ export function primeKeyboard() {
 }
 
 /** Label on the left, a text field on the right, like an iOS form row. */
-export function TextRow({ label, value, onInput, onDone, placeholder, autoFocus }: {
-  label: string; value: string; onInput: (v: string) => void; onDone?: () => void; placeholder?: string; autoFocus?: boolean;
+export function TextRow({ label, value, onInput, onDone, placeholder, autoFocus, type = 'text' }: {
+  label: string; value: string; onInput: (v: string) => void; onDone?: () => void; placeholder?: string; autoFocus?: boolean; type?: 'text' | 'password' | 'url';
 }) {
   const input = useRef<HTMLInputElement>(null);
   // autofocus only works on page load, so focus by hand when the row appears or is asked to.
@@ -86,7 +86,8 @@ export function TextRow({ label, value, onInput, onDone, placeholder, autoFocus 
     <label class="trow">
       <span class="mrow-label">{label}</span>
       <input
-        ref={input} class="trow-input" value={value} placeholder={placeholder} autocomplete="off" enterkeyhint="done"
+        ref={input} type={type as 'text'} class="trow-input" value={value} placeholder={placeholder} autocomplete="off" enterkeyhint="done"
+        autocapitalize={type === 'text' ? undefined : 'off'} spellcheck={type === 'text' ? undefined : false}
         onInput={(e) => onInput((e.target as HTMLInputElement).value)}
         // Enter just leaves the field; onBlur then finishes it, so it runs once.
         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLInputElement).blur(); } }}

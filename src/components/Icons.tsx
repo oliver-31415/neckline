@@ -34,6 +34,8 @@ export const IconUpload = () => <I><path d="M12 15V3M8 7l4-4 4 4M5 20h14" /></I>
 export const IconInfo = () => <I><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7.5v.5" /></I>;
 export const IconBell = () => <I><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4l2-2zM10 20a2 2 0 0 0 4 0" /></I>;
 export const IconEdit = () => <I><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" /></I>;
+export const IconSend = () => <I><path d="M12 19V5M6 11l6-6 6 6" /></I>;
+export const IconStop = () => <I fill="currentColor"><rect x="7" y="7" width="10" height="10" rx="2" /></I>;
 export const IconSpark = () => <I><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3zM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8L19 16z" /></I>;
 export const IconLock = () => <I><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></I>;
 export const IconUp = () => <I><path d="M12 19V5M6 11l6-6 6 6" /></I>;

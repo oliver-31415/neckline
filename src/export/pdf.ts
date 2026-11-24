@@ -17,6 +17,8 @@ export interface ReportOptions {
   includeLog: boolean;
   includeNotes: boolean;
   includeAssociations: boolean;
+  /** A summary the person approved from the assistant; printed near the top, labelled as such. */
+  aiSummary?: string;
 }
 
 const INK: [number, number, number] = [27, 27, 26];
@@ -85,6 +87,13 @@ export async function buildReport(all: Entry[], s: Settings, o: ReportOptions): 
   y += metaLines.length * 4.2 + 1;
   para('Self-recorded by the patient using a personal diary app. Pain is rated 0–10 (0 = none, 10 = worst imaginable). Patterns below describe what occurred alongside pain in these entries. They do not show cause.', 8.5, MUTED);
   y += 2;
+
+  /* ---------- summary from the assistant ---------- */
+  if (o.aiSummary?.trim()) {
+    h2('Summary', 'drafted with an AI assistant and approved by the patient');
+    for (const p of o.aiSummary.trim().split(/\n\s*\n/)) para(p.replace(/\s*\n\s*/g, ' '), 9.5, INK);
+    y += 2;
+  }
 
   /* ---------- at a glance ---------- */
   const tiles = [

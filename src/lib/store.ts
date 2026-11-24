@@ -21,6 +21,7 @@ export async function init() {
   const merged = { ...DEFAULT_SETTINGS, ...(s ?? {}), steps: { ...DEFAULT_SETTINGS.steps, ...(s?.steps ?? {}) } };
   merged.push = { enabled: !!s?.push?.enabled };
   merged.backup = { ...DEFAULT_SETTINGS.backup, ...s?.backup };
+  merged.ai = { ...DEFAULT_SETTINGS.ai, ...s?.ai };
   if (!merged.backup.serverUrl) merged.backup.serverUrl = DEFAULT_SETTINGS.backup.serverUrl;
   // Headache and migraine are always offered as symptoms.
   merged.symptoms = ['Headache', 'Migraine', ...merged.symptoms.filter((x) => x !== 'Headache' && x !== 'Migraine')];
