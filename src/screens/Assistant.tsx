@@ -1,10 +1,10 @@
 import { signal } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { settings } from '../lib/store';
-import { go } from '../lib/nav';
+import { go, sheet, tab, type Tab } from '../lib/nav';
 import { Sheet, showToast } from '../components/ui';
 import { Markdown } from '../components/Markdown';
-import { IconSend, IconShare, IconStop } from '../components/Icons';
+import { IconSend, IconShare, IconSpark, IconStop } from '../components/Icons';
 import { shareOrDownload } from '../export/files';
 import { PROVIDERS, ask, currentConfig, describeError, newConversation, type AgentEvents, type Conversation } from '../ai/agent';
 import { allTools, type Attachment, type ToolContext } from '../ai/tools';
@@ -35,12 +35,14 @@ export const openAssistant = (prompt?: string) => { assistant.value = { prompt }
 
 const ACTIONS = new Set(allTools().filter((t) => t.action).map((t) => t.name));
 
-const SUGGESTIONS = [
-  'What seems to make my pain worse?',
-  'How did this fortnight compare with the one before?',
-  'Has my medication seemed to help?',
-  'Write a report for my next appointment',
-];
+/** Starter questions, chosen for the screen the chat was opened from. */
+const SUGGESTIONS: Record<Tab, string[]> = {
+  checkin: ['How has my pain been this week?', 'What seems to make my pain worse?', 'Has my medication seemed to help?', 'Write a report for my next appointment'],
+  history: ['What was my worst day lately, and what was different?', 'How did this week compare with last week?', 'When did I last take each medication?', 'Is my pain getting better overall?'],
+  insights: ['What seems to make my pain worse?', 'Is anything linked to my headaches?', 'Is there a time of day my pain is worse?', 'Has my medication seemed to help?'],
+  report: ['Write a report for my next appointment', 'What should I ask my surgeon about?', 'Sum up the last month in a few lines', 'How did this fortnight compare with the one before?'],
+  settings: ['How has my pain been this week?', 'What seems to make my pain worse?', 'Has my medication seemed to help?', 'Write a report for my next appointment'],
+};
 
 function push(it: Item) { items.value = [...items.value, it]; }
 function patch(pred: (it: Item) => boolean, change: Partial<Item>) {
@@ -136,7 +138,7 @@ export function AssistantSheet() {
           )}
           {!items.value.length && (
             <div class="chat-suggest">
-              {SUGGESTIONS.map((q) => <button key={q} class="suggest" onClick={() => submit(q)}>{q}</button>)}
+              {SUGGESTIONS[tab.value].map((q) => <button key={q} class="suggest" onClick={() => submit(q)}>{q}</button>)}
             </div>
           )}
           <ChatItems />
@@ -156,6 +158,12 @@ export function AssistantSheet() {
       )}
     </Sheet>
   );
+}
+
+/** The floating Ask button on every screen, once the assistant is set up. */
+export function AskButton() {
+  if (!currentConfig() || assistant.value || sheet.value) return null;
+  return <button class="ask-fab" aria-label="Ask the assistant" onClick={() => openAssistant()}><IconSpark />Ask</button>;
 }
 
 /** Messages, with runs of tool calls shown together as one row of chips. */

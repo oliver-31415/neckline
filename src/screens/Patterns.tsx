@@ -10,8 +10,7 @@ import type { PainEntry } from '../lib/types';
 import { PainTrend, TrendLegend } from '../components/Charts';
 import { BodyMap, regionLabel } from '../components/BodyMap';
 import { Nav, Seg } from '../components/ui';
-import { openAssistant } from './Assistant';
-import { IconInfo, IconPatterns, IconSpark } from '../components/Icons';
+import { IconInfo, IconPatterns } from '../components/Icons';
 
 export const RANGES = [
   { v: 7, label: '7 days' }, { v: 14, label: '14 days' }, { v: 30, label: '30 days' }, { v: 90, label: '90 days' },
@@ -74,7 +73,6 @@ export function Patterns() {
   return (
     <div class="screen">
       <Nav title="Insights" />
-      <button class="ask-btn" onClick={() => openAssistant()}><IconSpark /> Ask about my results</button>
       <Seg required options={RANGES} value={days} onChange={(v) => setDays(v ?? days)} />
 
       <div class="stat-tiles">

@@ -14,7 +14,7 @@ async function run(provider) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => fail('page error ' + e.message));
-  await page.goto(BASE + '#/insights');
+  await page.goto(BASE + '#/report');
   await page.evaluate(async ({ provider, MOCK }) => {
     const db = await new Promise((r) => { const q = indexedDB.open('neckline', 1); q.onupgradeneeded = () => { const d = q.result; d.createObjectStore('entries', { keyPath: 'id' }).createIndex('time', 'time'); d.createObjectStore('photos'); d.createObjectStore('kv'); }; q.onsuccess = () => r(q.result); });
     const tx = db.transaction(['entries', 'kv'], 'readwrite');
@@ -30,7 +30,7 @@ async function run(provider) {
   }, { provider, MOCK });
   await page.reload();
   await page.waitForTimeout(700);
-  await page.getByRole('button', { name: /Ask about my results/ }).click();
+  await page.getByRole('button', { name: 'Ask the assistant' }).click();
   await page.waitForTimeout(400);
   await page.screenshot({ path: `${SHOTS}/ai-01-empty-${provider}.png` });
   await page.locator('.suggest', { hasText: 'Write a report' }).click();

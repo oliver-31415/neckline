@@ -12,7 +12,8 @@ import { Sheet, Toast, showToast } from './components/ui';
 import { IconClock, IconPatterns, IconPulse, IconReport } from './components/Icons';
 import { TYPE_STYLE } from './components/EntryRow';
 import type { ActivityEntry, DayEntry, MealEntry, PainEntry, PostureEntry, TreatmentEntry } from './lib/types';
-import { AssistantSheet } from './screens/Assistant';
+import { AskButton, AssistantSheet } from './screens/Assistant';
+import { currentConfig } from './ai/agent';
 
 effect(() => {
   const t = settings.value.theme;
@@ -47,7 +48,7 @@ export function App() {
   const t = tab.value;
 
   return (
-    <div class="app">
+    <div class={'app' + (currentConfig() ? ' has-ask' : '')}>
       {t === 'checkin' && <CheckIn key="home" />}
       {t === 'history' && <History />}
       {t === 'insights' && <Patterns />}
@@ -61,6 +62,7 @@ export function App() {
         <TabBtn id="report" label="Report" Icon={IconReport} />
       </nav>
 
+      <AskButton />
       <ActiveSheet />
       <AssistantSheet />
       <Toast />
