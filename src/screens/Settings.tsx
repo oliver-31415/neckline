@@ -6,7 +6,7 @@ import { POSTURES, STEPS } from '../lib/catalog';
 import { fmtSlot } from '../lib/time';
 import { Block, Chips, Nav, Seg, Toggle, showToast } from '../components/ui';
 import { IconBack, IconBell, IconDownload, IconLock, IconTrash, IconUpload } from '../components/Icons';
-import { disablePush, enablePush, pushSupported, syncSchedule, testPush } from '../lib/push';
+import { disablePush, enablePush, pushReady, pushSupported, syncSchedule, testPush } from '../lib/push';
 import { makeBackup, restoreBackup } from '../export/backup';
 import { shareOrDownload } from '../export/files';
 import { isStandalone } from '../lib/env';
@@ -28,7 +28,7 @@ export function Settings() {
 
   async function setTimes(checkinTimes: string[]) {
     await updateSettings({ checkinTimes: [...new Set(checkinTimes)].sort() });
-    if (s.push.enabled) syncSchedule(s.push.serverUrl, s.push.token, settings.value.checkinTimes).catch((e) => setPushErr(String(e.message ?? e)));
+    if (s.push.enabled) syncSchedule(settings.value.checkinTimes).catch((e) => setPushErr(String(e.message ?? e)));
   }
 
   async function togglePush(on: boolean) {
@@ -36,13 +36,13 @@ export function Settings() {
     setPushBusy(true);
     try {
       if (on) {
-        if (!s.push.serverUrl) throw new Error('Add your reminder server address first.');
-        await enablePush(s.push.serverUrl, s.push.token, s.checkinTimes);
+        if (!pushReady()) throw new Error('Sign in to your Neckline server below first.');
+        await enablePush(s.checkinTimes);
         showToast('Reminders on');
       } else {
-        await disablePush(s.push.serverUrl, s.push.token);
+        await disablePush();
       }
-      await updateSettings({ push: { ...s.push, enabled: on } });
+      await updateSettings({ push: { enabled: on } });
     } catch (e) {
       setPushErr((e as Error).message);
     } finally {
@@ -80,19 +80,15 @@ export function Settings() {
           <span style={{ width: 22, height: 22, color: 'var(--accent)' }}><IconBell /></span>
           <div class="grow">
             <div style={{ fontWeight: 600 }}>Notify me at check-in times</div>
-            <div class="small muted">{!pushSupported() || !isStandalone() ? 'Home Screen app only' : s.push.enabled ? 'On' : 'Off'}</div>
+            <div class="small muted">{!pushSupported() || !isStandalone() ? 'Home Screen app only' : !pushReady() ? 'Sign in to your server below' : s.push.enabled ? 'On' : 'Off'}</div>
           </div>
           <Toggle checked={s.push.enabled} label="Reminders" onChange={(v) => !pushBusy && togglePush(v)} />
         </div>
-        <label class="field"><span>Reminder server address</span>
-          <input class="input" type="url" inputMode="url" autocapitalize="off" autocorrect="off" spellcheck={false} placeholder="https://reminders.example.com" value={s.push.serverUrl} onChange={(e) => updateSettings({ push: { ...s.push, serverUrl: (e.target as HTMLInputElement).value.trim() } })} />
-        </label>
-        <label class="field"><span>Access token (if your server uses one)</span>
-          <input class="input" type="password" autocapitalize="off" value={s.push.token} onChange={(e) => updateSettings({ push: { ...s.push, token: (e.target as HTMLInputElement).value.trim() } })} />
-        </label>
-        {s.push.enabled && <button class="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => testPush(s.push.serverUrl, s.push.token).then(() => showToast('Test sent')).catch((e) => setPushErr(e.message))}>Send a test reminder</button>}
+        {s.push.enabled && <button class="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => testPush().then(() => showToast('Test sent')).catch((e) => setPushErr(e.message))}>Send a test reminder</button>}
         {pushErr && <div class="small" style={{ color: 'var(--danger)' }}>{pushErr}</div>}
       </Block>
+
+      <ServerBackup />
 
       <Block title="Check-in questions">
         {STEPS.map((st) => (
@@ -134,8 +130,6 @@ export function Settings() {
       <Block title="Appearance">
         <Seg options={[{ v: 'system', label: 'Automatic' }, { v: 'light', label: 'Light' }, { v: 'dark', label: 'Dark' }]} value={s.theme} onChange={(theme) => updateSettings({ theme: theme ?? 'system' })} />
       </Block>
-
-      <ServerBackup />
 
       <Block title="Your data" aside={usage}>
         <div class="row between">

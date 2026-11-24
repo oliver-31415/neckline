@@ -14,9 +14,9 @@ export interface Backup {
 
 const toDataUrl = (b: Blob) => new Promise<string>((r) => { const f = new FileReader(); f.onload = () => r(f.result as string); f.readAsDataURL(b); });
 
-/** Settings as they go into a backup: without the backup server sign-in. */
+/** Settings as they go into a backup: without the server sign-in or backup bookkeeping (which would make every backup look like a change). */
 export function shareableSettings(s: Settings = settings.value): Settings {
-  return { ...s, backup: { ...s.backup, auth: '', key: '', lastHash: '' } };
+  return { ...s, backup: { ...s.backup, auth: '', key: '', lastAt: null, lastHash: '' } };
 }
 
 export async function backupData(withPhotos: boolean): Promise<Backup> {

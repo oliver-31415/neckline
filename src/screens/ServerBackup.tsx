@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { entries, settings, updateSettings } from '../lib/store';
+import { disablePush } from '../lib/push';
 import { backUpNow, cloudBusy, cloudError, listRemote, restoreRemote, signIn, signOut, signedIn, type RemoteBackup } from '../lib/cloud';
 import { fmtDayRelative, fmtTime } from '../lib/time';
 import { Block, Toggle, showToast } from '../components/ui';
@@ -9,7 +10,7 @@ import { IconDownload, IconLock, IconUpload } from '../components/Icons';
 const when = (t: number) => `${fmtDayRelative(t)}, ${fmtTime(t)}`;
 const size = (n: number) => (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
 
-/** Sign in to your own backup server, then back up automatically and restore any saved copy. */
+/** Sign in to your Neckline server, then back up automatically and restore any saved copy. Reminders use the same sign-in. */
 export function ServerBackup() {
   const b = settings.value.backup;
   const on = signedIn();
@@ -52,10 +53,10 @@ export function ServerBackup() {
 
   if (!on) {
     return (
-      <Block title="Backup server">
+      <Block title="Neckline server">
         <form class="col-form" onSubmit={submit}>
           <label class="field"><span>Server address</span>
-            <input class="input" type="url" inputMode="url" autocapitalize="off" autocorrect="off" spellcheck={false} placeholder="https://backup.example.com" value={url} onInput={(e) => setUrl((e.target as HTMLInputElement).value)} />
+            <input class="input" type="url" inputMode="url" autocapitalize="off" autocorrect="off" spellcheck={false} placeholder="https://neckline.wright-guys.com" value={url} onInput={(e) => setUrl((e.target as HTMLInputElement).value)} />
           </label>
           <label class="field"><span>User name</span>
             <input class="input" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck={false} value={user} onInput={(e) => setUser((e.target as HTMLInputElement).value)} />
@@ -72,7 +73,7 @@ export function ServerBackup() {
 
   const shownErr = err || cloudError.value;
   return (
-    <Block title="Backup server" aside={b.user}>
+    <Block title="Neckline server" aside={b.user}>
       <div class="row between">
         <span>Last backup</span>
         <span class="muted">{cloudBusy.value ? 'Backing up…' : b.lastAt ? when(b.lastAt) : 'Not yet'}</span>
@@ -89,7 +90,10 @@ export function ServerBackup() {
       >
         <IconDownload /> {busy ? 'Working…' : 'Restore from server'}
       </MenuButton>
-      <button class="btn wide" onClick={() => confirm('Sign out of the backup server on this phone? Backups already on the server stay there.') && signOut()}>Sign out</button>
+      <button class="btn wide" onClick={() => confirm('Sign out on this phone? Backups already on the server stay there. Reminders stop.') && run(async () => {
+        if (settings.value.push.enabled) { await disablePush().catch(() => {}); await updateSettings({ push: { enabled: false } }); }
+        await signOut();
+      })}>Sign out</button>
       {shownErr && <div class="small" style={{ color: 'var(--danger)' }}>{shownErr}</div>}
     </Block>
   );

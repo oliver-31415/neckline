@@ -3,7 +3,7 @@ import { applyBackup, backupData, shareableSettings, type Backup } from '../expo
 import { entries, settings, updateSettings } from './store';
 
 /*
- * Optional backups to a server you run yourself (see backup-server/).
+ * Optional backups to your own Neckline server (see server/), which also sends reminders.
  * Everything is encrypted on the phone before it's sent, with a key made from your password.
  * The server only sees your user name and a scrambled blob, and can't open it.
  *
@@ -35,16 +35,17 @@ export async function deriveKeys(user: string, password: string) {
   return { auth: b64u(await part('neckline auth')), key: b64u(await part('neckline encrypt')) };
 }
 
-async function request(path: string, init: RequestInit = {}, b = settings.value.backup) {
+/** A signed-in call to your Neckline server; also used for reminders. */
+export async function request(path: string, init: RequestInit = {}, b = settings.value.backup) {
   let res: Response;
   try {
     res = await fetch(clean(b.serverUrl) + path, { ...init, cache: 'no-store', headers: { ...init.headers, authorization: `Bearer ${b.user}:${b.auth}` } });
   } catch {
-    throw new Error('Couldn’t reach the backup server.');
+    throw new Error('Couldn’t reach your Neckline server.');
   }
   if (res.status === 401) throw new Error('Wrong user name or password.');
   if (res.status === 429) throw new Error('Too many attempts. Try again in 15 minutes.');
-  if (!res.ok) throw new Error(`The backup server replied ${res.status}${res.status === 413 ? ' (backup too large)' : ''}.`);
+  if (!res.ok) throw new Error(`The server replied ${res.status}${res.status === 413 ? ' (backup too large)' : ''}.`);
   return res;
 }
 
@@ -84,7 +85,7 @@ export async function signIn(serverUrl: string, rawUser: string, password: strin
   if (!/^https?:\/\//.test(serverUrl.trim())) throw new Error('Enter the server address, starting with https://');
   if (!/^[a-z0-9_-]{1,32}$/.test(user)) throw new Error('Check the user name.');
   const b = { ...settings.value.backup, serverUrl: clean(serverUrl), user, ...(await deriveKeys(user, password)), lastAt: null, lastHash: '' };
-  const list = (await (await request('/backups', {}, b)).json()) as RemoteBackup[];
+  const list = (await (await request('/backup', {}, b)).json()) as RemoteBackup[];
   await updateSettings({ backup: b });
   return list;
 }
@@ -96,7 +97,7 @@ export async function signOut() {
 export const signedIn = () => !!(settings.value.backup.auth && settings.value.backup.key);
 
 export async function listRemote() {
-  return (await (await request('/backups')).json()) as RemoteBackup[];
+  return (await (await request('/backup')).json()) as RemoteBackup[];
 }
 
 async function fingerprint() {
@@ -112,7 +113,7 @@ export async function backUpNow(force = false) {
     const hash = await fingerprint();
     if (!force && hash === settings.value.backup.lastHash) return false;
     const blob = await seal(await backupData(true), settings.value.backup.key);
-    const r = (await (await request('/backups', { method: 'POST', body: blob, headers: { 'content-type': 'application/octet-stream' } })).json()) as RemoteBackup;
+    const r = (await (await request('/backup', { method: 'POST', body: blob, headers: { 'content-type': 'application/octet-stream' } })).json()) as RemoteBackup;
     await updateSettings({ backup: { ...settings.value.backup, lastAt: r.at, lastHash: hash } });
     cloudError.value = '';
     return true;
@@ -125,7 +126,7 @@ export async function backUpNow(force = false) {
 }
 
 export async function restoreRemote(id: string, restoreSettings: boolean) {
-  const buf = await (await request('/backups/' + id)).arrayBuffer();
+  const buf = await (await request('/backup/' + id)).arrayBuffer();
   return applyBackup(await open(buf, settings.value.backup.key), restoreSettings);
 }
 

@@ -7,9 +7,9 @@ It doesn't diagnose anything.
 
 - **Local only.** Entries and meal photos live in the phone's IndexedDB, and
   the app asks the browser to keep them permanently (persistent storage). No
-  analytics, and no network calls apart from two optional servers you run
-  yourself: reminders, which only know your check-in times, and encrypted
-  backups, which can't read what they store.
+  analytics, and no network calls apart from one optional server you run
+  yourself. It sends check-in reminders, knowing only your times, and keeps
+  encrypted backups it can't read.
 - **Opens on the check-in.** One overall pain slider, a body diagram you tap,
   and a slider for each marked area. Everything else (what it feels like,
   duration, impact, symptoms, what you were doing, a note) sits in optional rows
@@ -59,8 +59,7 @@ from Safari tabs.
 
 ## Reminders and backups (optional)
 
-See [`push-server/README.md`](push-server/README.md) and
-[`backup-server/README.md`](backup-server/README.md).
+See [`server/README.md`](server/README.md).
 
 ## Backups
 

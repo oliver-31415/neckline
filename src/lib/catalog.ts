@@ -93,6 +93,9 @@ export const STEPS: { id: StepId; label: string; hint: string }[] = [
   { id: 'note', label: 'Note', hint: '' },
 ];
 
+/** Your own Neckline server: backups at /backup, reminders at /reminders. */
+export const DEFAULT_SERVER = 'https://neckline.wright-guys.com';
+
 export const DEFAULT_SETTINGS: Settings = {
   name: '',
   checkinTimes: ['09:00', '14:00', '20:00'],
@@ -110,8 +113,8 @@ export const DEFAULT_SETTINGS: Settings = {
   nextAppointment: '',
   questions: [],
   theme: 'system',
-  push: { serverUrl: '', token: '', enabled: false },
-  backup: { serverUrl: '', user: '', auth: '', key: '', auto: true, lastAt: null, lastHash: '' },
+  push: { enabled: false },
+  backup: { serverUrl: DEFAULT_SERVER, user: '', auth: '', key: '', auto: true, lastAt: null, lastHash: '' },
   onboarded: false,
   version: 3,
 };

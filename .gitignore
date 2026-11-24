@@ -1,6 +1,5 @@
 node_modules
 dist
-push-server/node_modules
-push-server/data
 shots
-backup-server/data
+server/node_modules
+server/data

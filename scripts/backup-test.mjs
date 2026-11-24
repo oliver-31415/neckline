@@ -1,9 +1,9 @@
 // End-to-end: sign in to a local backup server, back up, wipe the phone, restore.
-// Needs: vite preview on 4173 and backup-server on 8788 with user "tester" / "correct horse battery".
+// Needs: vite preview on 4173 and server/ on 8799 (DATA_DIR elsewhere) with user "tester" / "correct horse battery".
 import { launch } from './browser.mjs';
 
 const BASE = process.env.BASE ?? 'http://localhost:4173/';
-const SERVER = process.env.SERVER ?? 'http://127.0.0.1:8788';
+const SERVER = process.env.SERVER ?? 'http://127.0.0.1:8799';
 const browser = await launch();
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
 const page = await ctx.newPage();
@@ -36,8 +36,8 @@ await form.locator('input[type=password]').fill('correct horse battery');
 await form.locator('button').click();
 await page.getByText('Last backup').waitFor({ timeout: 15000 });
 await page.waitForFunction(() => !document.body.innerText.includes('Not yet') && !document.body.innerText.includes('Backing up'), null, { timeout: 15000 });
-console.log('signed in; status:', await page.locator('.section', { hasText: 'Backup server' }).innerText());
-await page.locator('.section', { hasText: 'Backup server' }).screenshot({ path: 'shots/backup-block.png' });
+console.log('signed in; status:', await page.locator('.section', { hasText: 'Neckline server' }).innerText());
+await page.locator('.section', { hasText: 'Neckline server' }).screenshot({ path: 'shots/backup-block.png' });
 
 // Stored settings never contain the password; the uploaded file is ciphertext.
 const stored = await page.evaluate(async () => {
@@ -48,6 +48,14 @@ if (JSON.stringify(stored).includes('correct horse')) fail('password stored on p
 console.log('stored backup settings keys:', Object.keys(stored.backup), 'user:', stored.backup.user);
 
 const before = stored.backup.lastAt;
+
+// An idle app must not keep re-uploading: each backup's own bookkeeping isn't a change.
+await page.waitForTimeout(12000);
+const idle = await page.evaluate(async () => {
+  const db = await new Promise((r) => { const q = indexedDB.open('neckline', 1); q.onsuccess = () => r(q.result); });
+  return new Promise((r) => { const q = db.transaction('kv').objectStore('kv').get('settings'); q.onsuccess = () => r(q.result.backup.lastAt); });
+});
+if (idle !== before) fail('backed up again with nothing changed'); else console.log('idle: no extra backups');
 
 // Wipe the phone, sign in again, restore.
 await ctx.clearCookies();
@@ -73,3 +81,4 @@ const items = await page.locator('.menu .menu-item').allInnerTexts();
 console.log('restore menu:', items);
 await page.screenshot({ path: 'shots/backup-restore-menu.png' });
 await browser.close();
+
