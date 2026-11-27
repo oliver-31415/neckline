@@ -9,7 +9,8 @@ import { BodyMap, SPINE, regionLabel, spineRangeLabel } from '../components/Body
 import { PainPill, PainSlider, Sheet, showToast } from '../components/ui';
 import { IconClose, IconDownChev, IconGear, IconPlus, IconUpChev, IconUpDown } from '../components/Icons';
 import { MenuButton, MenuRow } from '../components/Menu';
-import { CARD_STYLE, CardShell, OtherCardView, TextRow, primeKeyboard, WhenRow, cardEntry, cardReady, type CardKind, type OtherCard } from '../forms/LogCards';
+import { CARD_STYLE, CardShell, OtherCardView, TextRow, primeKeyboard, WhenRow, cardEntry, cardReady, type CardKind, type MoveCard, type OtherCard } from '../forms/LogCards';
+import { EntryRow } from '../components/EntryRow';
 
 /** A pain or symptom being logged. `when` null = now; `links` are spine ranges sharing one score (not saved). */
 type Draft = PainEntry & { levels: Record<string, number>; kinds: Record<string, Sensation[]>; when: number | null; links: string[][] };
@@ -184,7 +185,7 @@ function SymptomRows({ d, set, autoOpen }: { d: Draft; set: (p: Partial<Draft>) 
     set({ symptoms, symptomLevels: Object.fromEntries(Object.entries(d.symptomLevels ?? {}).filter(([k]) => symptoms.includes(k))) });
   const commit = () => {
     const v = text.trim();
-    if (v) { rememberChip('symptoms', v); if (!d.symptoms.includes(v)) choose([...d.symptoms, v]); }
+    if (v) { const name = rememberChip('symptoms', v); if (!d.symptoms.includes(name)) choose([...d.symptoms, name]); }
     setTyping(false);
     setText('');
   };
@@ -195,7 +196,7 @@ function SymptomRows({ d, set, autoOpen }: { d: Draft; set: (p: Partial<Draft>) 
         items={[...options.map((x) => ({ v: x, label: x })), { v: 'new', label: 'Something else…', action: true }]}
         value={d.symptoms} onChange={choose} onAction={() => { primeKeyboard(); setTyping(true); }}
       />
-      {typing && <TextRow label="Symptom" value={text} onInput={setText} onDone={commit} autoFocus />}
+      {typing && <TextRow label="Symptom" placeholder="New symptom" actionLabel="Add" value={text} onInput={setText} onDone={commit} autoFocus />}
       {d.symptoms.map((x) => (
         <div class="arow" key={x}>
           <div class="arow-line"><span class="arow-label">{x}</span></div>
@@ -247,7 +248,7 @@ const fromEntry = (entry: PainEntry): Draft => {
   return { ...d, links: initialLinks(d) };
 };
 
-/** Home: log pain, a symptom, a medication or a posture/exercise; stack as many as you like; save them together. */
+/** Home: log pain, a symptom, a medication or a posture/activity/exercise; stack as many as you like; save them together. */
 export function CheckIn({ entry }: { entry?: PainEntry }) {
   return entry ? <EditEntry entry={entry} /> : <Home />;
 }
@@ -255,10 +256,50 @@ export function CheckIn({ entry }: { entry?: PainEntry }) {
 /** Editing a saved pain or symptom entry from History. */
 function EditEntry({ entry }: { entry: PainEntry }) {
   const [d, setD] = useState(() => fromEntry(entry));
-  const set = (p: Partial<Draft>) => setD({ ...d, ...p });
+  const dRef = useRef(d);
+  dRef.current = d;
+  const set = (p: Partial<Draft>) => { dRef.current = { ...dRef.current, ...p }; setD(dRef.current); };
+  const [moves, setMoves] = useState<MoveCard[]>([]);
+  const movesRef = useRef(moves);
+  movesRef.current = moves;
+  const addedMove = useRef<string | null>(null);
   const hasPain = Object.keys(entry.regions).length > 0 || !entry.symptoms.length;
+  const linked = entry.group
+    ? entries.value.filter((e) => e.group === entry.group && e.id !== entry.id && (e.type === 'posture' || e.type === 'activity' || (e.type === 'treatment' && e.kind === 'exercises')))
+    : [];
+
+  useEffect(() => {
+    if (!addedMove.current) return;
+    document.getElementById('card-' + addedMove.current)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    addedMove.current = null;
+  }, [moves.length]);
+
+  const addMove = () => {
+    const c: MoveCard = { key: uid(), kind: 'move', fresh: true, when: null };
+    addedMove.current = c.key;
+    movesRef.current = [...movesRef.current, c];
+    setMoves(movesRef.current);
+    navigator.vibrate?.(8);
+  };
+  const updateMove = (key: string, c: MoveCard) => {
+    movesRef.current = movesRef.current.map((x) => (x.key === key ? c : x));
+    setMoves(movesRef.current);
+  };
+  const removeMove = (key: string) => {
+    movesRef.current = movesRef.current.filter((x) => x.key !== key);
+    setMoves(movesRef.current);
+  };
+
   async function save() {
-    await saveEntry(toEntry(d, Date.now()));
+    (document.activeElement as HTMLElement | null)?.blur?.();
+    const cur = dRef.current;
+    const readyMoves = movesRef.current.filter(cardReady);
+    const refTime = cur.when ?? entry.time;
+    const group = cur.group || (readyMoves.length ? uid() : undefined);
+    await saveEntry(toEntry(cur, Date.now(), group ? { group } : {}));
+    for (const m of readyMoves) {
+      await saveEntry(cardEntry(m, refTime, group));
+    }
     closeSheet();
     showToast('Saved');
   }
@@ -269,6 +310,26 @@ function EditEntry({ entry }: { entry: PainEntry }) {
           {hasPain && <AreaEditor d={d} set={set} />}
           {(!hasPain || entry.symptoms.length > 0) && <SymptomRows d={d} set={set} />}
           <DetailRows d={d} set={set} />
+        </div>
+      </section>
+      {linked.length > 0 && (
+        <section class="section">
+          <div class="sec-head"><span>What you were doing before it</span></div>
+          <div class="group flush">{linked.map((e) => <EntryRow key={e.id} e={e} />)}</div>
+        </section>
+      )}
+      {moves.map((m) => (
+        <div id={'card-' + m.key} key={m.key}>
+          <OtherCardView card={m} refTime={d.when ?? entry.time} onChange={(n) => updateMove(m.key, n as MoveCard)} onRemove={() => removeMove(m.key)} />
+        </div>
+      ))}
+      <section class="section">
+        <div class="group">
+          <button type="button" class="row-item add-item" onClick={addMove}>
+            <span class="row-icon small" style={{ background: CARD_STYLE.move.color }}><CARD_STYLE.move.Icon /></span>
+            <span class="row-label">{moves.length || linked.length ? 'I was doing something else too' : 'What I was doing before it'}</span>
+            <span class="add-plus"><IconPlus /></span>
+          </button>
         </div>
       </section>
       <section class="section">
@@ -299,6 +360,8 @@ function addPhrase(k: CardKind, cards: Card[]): string | null {
 function Home() {
   const s = settings.value;
   const [cards, setCards] = useState<Card[]>(() => (pendingSlot.value ? [newCard('pain')] : []));
+  const cardsRef = useRef(cards);
+  cardsRef.current = cards;
   const added = useRef<string | null>(null);
 
   // A reminder opened the app: start with the pain card.
@@ -318,22 +381,32 @@ function Home() {
     // With no saved medications the card opens on a name field, so get the keyboard up during this tap.
     if (kind === 'med' && !settings.value.treatments.some((t) => t.kind === 'medication')) primeKeyboard();
     if (cards.length) added.current = c.key;
-    setCards([...cards, c]);
+    cardsRef.current = [...cardsRef.current, c];
+    setCards(cardsRef.current);
     navigator.vibrate?.(8);
   };
-  const update = (key: string, c: Card) => setCards((cs) => cs.map((x) => (x.key === key ? c : x)));
-  const remove = (key: string) => setCards((cs) => cs.filter((x) => x.key !== key));
+  const update = (key: string, c: Card) => {
+    cardsRef.current = cardsRef.current.map((x) => (x.key === key ? c : x));
+    setCards(cardsRef.current);
+  };
+  const remove = (key: string) => {
+    cardsRef.current = cardsRef.current.filter((x) => x.key !== key);
+    setCards(cardsRef.current);
+  };
   const isReady = (c: Card) =>
     !('d' in c) ? cardReady(c) : c.kind === 'pain' ? Object.keys(c.d.regions).length > 0 : c.d.symptoms.length > 0;
   const ready = cards.filter(isReady);
 
   async function save() {
+    (document.activeElement as HTMLElement | null)?.blur?.();
+    const readyNow = cardsRef.current.filter(isReady);
+    if (!readyNow.length) return;
     const now = Date.now();
-    const group = ready.length > 1 ? uid() : undefined;
+    const group = readyNow.length > 1 ? uid() : undefined;
     const pains = entries.value.filter((e): e is PainEntry => e.type === 'pain');
     const due = pendingSlot.value ?? s.checkinTimes.find((t) => slotStatus(t, pains) === 'due') ?? null;
     const ids: string[] = [];
-    for (const c of ready) {
+    for (const c of readyNow) {
       const e = 'd' in c
         ? toEntry(c.d, now, { group, slot: c.kind === 'pain' && c.d.when == null ? due : null })
         : cardEntry(c, now, group);
@@ -341,6 +414,7 @@ function Home() {
     }
     navigator.vibrate?.(12);
     pendingSlot.value = null;
+    cardsRef.current = [];
     setCards([]);
     window.scrollTo({ top: 0, behavior: 'smooth' });
     showToast('Saved', { label: 'Undo', run: () => ids.forEach((id) => removeEntry(id)) });

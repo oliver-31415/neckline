@@ -7,10 +7,11 @@ import type { Entry } from '../lib/types';
 
 const IconPlusBig = () => <span style={{ width: 56, height: 56, display: 'grid', placeItems: 'center' }}><span style={{ width: 28, height: 28 }}><IconPlus /></span></span>;
 
-export function PostureTiles({ options, value, onChange, single }: { options: string[]; value: string[]; onChange: (v: string[]) => void; single?: boolean }) {
+export function PostureTiles({ options, value, onChange, single, onAdd }: { options: string[]; value: string[]; onChange: (v: string[]) => void; single?: boolean; onAdd?: (v: string) => string | void }) {
+  const extra = value.filter((v) => !options.includes(v));
   return (
     <div class="tiles">
-      {options.map((p) => {
+      {[...options, ...extra].map((p) => {
         const Art = POSTURE_ART[p] ?? ActivityFallback;
         const on = value.includes(p);
         return (
@@ -20,11 +21,20 @@ export function PostureTiles({ options, value, onChange, single }: { options: st
           </button>
         );
       })}
+      {onAdd && (
+        <button class="tile" style={{ borderStyle: 'dashed', color: 'var(--accent)' }} onClick={() => {
+          const raw = prompt('Name this posture')?.trim();
+          if (raw) { const v = onAdd(raw) || raw; onChange(single ? [v] : value.includes(v) ? value : [...value, v]); }
+        }}>
+          <IconPlusBig />
+          Other…
+        </button>
+      )}
     </div>
   );
 }
 
-export function ActivityTiles({ options, value, onChange, single, onAdd }: { options: string[]; value: string[]; onChange: (v: string[]) => void; single?: boolean; onAdd?: (v: string) => void }) {
+export function ActivityTiles({ options, value, onChange, single, onAdd }: { options: string[]; value: string[]; onChange: (v: string[]) => void; single?: boolean; onAdd?: (v: string) => string | void }) {
   const extra = value.filter((v) => !options.includes(v));
   return (
     <div class="tiles">
@@ -40,8 +50,8 @@ export function ActivityTiles({ options, value, onChange, single, onAdd }: { opt
       })}
       {onAdd && (
         <button class="tile" style={{ borderStyle: 'dashed', color: 'var(--accent)' }} onClick={() => {
-          const v = prompt('Name this activity')?.trim();
-          if (v) { onAdd(v); onChange(single ? [v] : [...value, v]); }
+          const raw = prompt('Name this activity')?.trim();
+          if (raw) { const v = onAdd(raw) || raw; onChange(single ? [v] : value.includes(v) ? value : [...value, v]); }
         }}>
           <IconPlusBig />
           Other…

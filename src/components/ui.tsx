@@ -54,7 +54,7 @@ export function Sheet({ title, onClose, children, action, tall }: {
           <h2>{title}</h2>
           {action
             ? <button class="bar-btn strong" disabled={action.disabled} onClick={action.onClick}>{action.label}</button>
-            : <button class="bar-btn strong" onClick={onClose}>Done</button>}
+            : <button class="bar-btn strong" onClick={() => { (document.activeElement as HTMLElement | null)?.blur?.(); onClose(); }}>Done</button>}
         </div>
         <div class="sheet-body">{children}</div>
       </div>

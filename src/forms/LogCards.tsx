@@ -1,21 +1,21 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { POSTURES } from '../lib/catalog';
-import { rememberChip, rememberTreatment, settings, uid } from '../lib/store';
+import { rememberChip, rememberPosture, rememberTreatment, settings, uid } from '../lib/store';
 import { HOUR, fmtDayRelative, fmtMinutes, fmtTime, fromLocalInput, toLocalInput } from '../lib/time';
-import type { PostureEntry, TreatmentEntry } from '../lib/types';
+import type { ActivityEntry, PostureEntry, TreatmentEntry } from '../lib/types';
 import { IconBody, IconClose, IconPill, IconPosture, IconSymptom } from '../components/Icons';
 import { MenuRow, type MenuItem } from '../components/Menu';
 
 /*
- * The home screen is built from cards: pain, a symptom, a medication, or a posture/exercise.
+ * The home screen is built from cards: pain, a symptom, a medication, or a posture/activity/exercise.
  * Any number can be stacked and saved together; each keeps its own time and length.
  */
 
 export type CardKind = 'pain' | 'symptom' | 'med' | 'move';
-/** when: null means "now", resolved at save time. fresh: just added, so its first menu opens by itself. */
+/** when: null means "now" (or just before the entry being edited), resolved at save time. fresh: just added, so its first menu opens by itself. */
 export interface MedCard { key: string; kind: 'med'; fresh?: boolean; name?: string; dose: string; when: number | null }
-/** pick: "p:<posture id>" or "x:<exercise name>". */
+/** pick: "p:<posture id>", "a:<activity name>", or "x:<exercise name>". */
 export interface MoveCard { key: string; kind: 'move'; fresh?: boolean; pick?: string; when: number | null; minutes?: number; hold?: number }
 export type OtherCard = MedCard | MoveCard;
 
@@ -23,13 +23,15 @@ export const CARD_STYLE: Record<CardKind, { label: string; color: string; Icon: 
   pain: { label: 'Pain', color: 'var(--pain)', Icon: IconBody },
   symptom: { label: 'Symptom', color: 'var(--symptom)', Icon: IconSymptom },
   med: { label: 'Medication', color: 'var(--treatment)', Icon: IconPill },
-  move: { label: 'Posture or exercise', color: 'var(--posture)', Icon: IconPosture },
+  move: { label: 'Posture or activity', color: 'var(--posture)', Icon: IconPosture },
 };
 
 const FOR = [5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240, 360];
 const HOLDS = [5, 10, 15, 20, 30, 45, 60];
 const AGO = [0, 0.25, 0.5, 1, 2, 3, 4, 6, 8, 12, 24];
+const AGO_BEFORE = [0, 0.25, 0.5, 1, 2, 3, 4, 6];
 const agoLabel = (h: number) => (h === 0 ? 'Now' : h === 24 ? 'Yesterday, same time' : h < 1 ? `${h * 60} min ago` : `${h} h ago`);
+const beforeLabel = (h: number) => (h === 0 ? 'Just before' : h < 1 ? `${h * 60} min before` : `${h} h before`);
 
 /** Stretch-type exercises also get a "hold" row. */
 const hasHolds = (name: string) => /stretch|physio|yoga|pilates|tuck|glide|hold/i.test(name);
@@ -44,8 +46,8 @@ export function cardReady(c: OtherCard) {
   return c.kind === 'move' ? !!c.pick : !!c.name;
 }
 
-/** Turns a finished card into a diary entry. A posture or exercise logged "now" with a length is taken to have just ended. */
-export function cardEntry(c: OtherCard, now: number, group?: string): PostureEntry | TreatmentEntry {
+/** Turns a finished card into a diary entry. A posture, activity or exercise logged "now" (or "just before") with a length is taken to have just ended. */
+export function cardEntry(c: OtherCard, now: number, group?: string): PostureEntry | ActivityEntry | TreatmentEntry {
   const base = (time: number) => ({ id: uid(), time, createdAt: 0, updatedAt: 0, note: '', group });
   if (c.kind === 'med') {
     rememberTreatment(c.name!, 'medication', c.dose.trim() || undefined);
@@ -54,6 +56,9 @@ export function cardEntry(c: OtherCard, now: number, group?: string): PostureEnt
   const start = c.when ?? now - (c.minutes ?? 0) * 60_000;
   if (c.pick!.startsWith('p:')) {
     return { ...base(start), type: 'posture', posture: c.pick!.slice(2), minutes: c.minutes ?? null, breaks: null };
+  }
+  if (c.pick!.startsWith('a:')) {
+    return { ...base(start), type: 'activity', activity: c.pick!.slice(2), minutes: c.minutes ?? null, effort: null };
   }
   return {
     ...base(start), type: 'treatment', kind: 'exercises', name: c.pick!.slice(2),
@@ -76,10 +81,11 @@ export function primeKeyboard() {
 }
 
 /** Label on the left, a text field on the right, like an iOS form row. */
-export function TextRow({ label, value, onInput, onDone, placeholder, autoFocus, type = 'text' }: {
-  label: string; value: string; onInput: (v: string) => void; onDone?: () => void; placeholder?: string; autoFocus?: boolean; type?: 'text' | 'password' | 'url';
+export function TextRow({ label, value, onInput, onDone, placeholder, autoFocus, type = 'text', actionLabel }: {
+  label: string; value: string; onInput: (v: string) => void; onDone?: () => void; placeholder?: string; autoFocus?: boolean; type?: 'text' | 'password' | 'url'; actionLabel?: string;
 }) {
   const input = useRef<HTMLInputElement>(null);
+  const skipBlur = useRef(false);
   // autofocus only works on page load, so focus by hand when the row appears or is asked to.
   useEffect(() => { if (autoFocus) input.current?.focus(); }, [autoFocus]);
   return (
@@ -91,20 +97,32 @@ export function TextRow({ label, value, onInput, onDone, placeholder, autoFocus,
         onInput={(e) => onInput((e.target as HTMLInputElement).value)}
         // Enter just leaves the field; onBlur then finishes it, so it runs once.
         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLInputElement).blur(); } }}
-        onBlur={() => onDone?.()}
+        onBlur={() => { if (!skipBlur.current) onDone?.(); }}
       />
+      {actionLabel && value.trim() && (
+        <button
+          type="button" class="btn sm"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={(e) => { e.preventDefault(); skipBlur.current = true; onDone?.(); input.current?.blur(); skipBlur.current = false; }}
+        >
+          {actionLabel}
+        </button>
+      )}
     </label>
   );
 }
 
-/** Now / so long ago / yesterday, or an exact date and time. null = now. */
-export function WhenRow({ label = 'When', value, onChange }: { label?: string; value: number | null; onChange: (t: number | null) => void }) {
-  const [base] = useState(() => Date.now());
+/** Now / so long ago / yesterday, or an exact date and time. When refTime is given, presets are relative to that entry ("Just before", "1 h before"…). */
+export function WhenRow({ label = 'When', value, refTime, onChange }: { label?: string; value: number | null; refTime?: number; onChange: (t: number | null) => void }) {
+  const [nowBase] = useState(() => Date.now());
+  const base = refTime ?? nowBase;
+  const presets = refTime != null ? AGO_BEFORE : AGO;
+  const fmt = refTime != null ? beforeLabel : agoLabel;
   const [picking, setPicking] = useState(false);
   const input = useRef<HTMLInputElement>(null);
-  const preset = value == null ? 0 : AGO.find((h) => h && Math.abs(base - h * HOUR - value) < 60_000);
-  const display = value == null ? 'Now' : preset === 24 ? `Yesterday, ${fmtTime(value)}` : preset != null ? agoLabel(preset) : `${fmtDayRelative(value)}, ${fmtTime(value)}`;
-  const items: MenuItem[] = [...AGO.map((h) => ({ v: String(h), label: agoLabel(h) })), { v: 'pick', label: 'Choose date & time…', action: true }];
+  const preset = value == null ? 0 : presets.find((h) => h && Math.abs(base - h * HOUR - value) < 60_000);
+  const display = value == null ? fmt(0) : (refTime == null && preset === 24) ? `Yesterday, ${fmtTime(value)}` : preset != null ? fmt(preset) : `${fmtDayRelative(value)}, ${fmtTime(value)}`;
+  const items: MenuItem[] = [...presets.map((h) => ({ v: String(h), label: fmt(h) })), { v: 'pick', label: 'Choose date & time…', action: true }];
   useEffect(() => {
     if (!picking) return;
     input.current?.focus();
@@ -159,8 +177,15 @@ export function CardShell({ kind, title, onRemove, children }: { kind: CardKind;
   );
 }
 
-export function OtherCardView({ card, onChange, onRemove }: { card: OtherCard; onChange: (c: OtherCard) => void; onRemove: () => void }) {
+const ADD_META = {
+  p: { label: 'Posture', placeholder: 'New posture' },
+  a: { label: 'Activity', placeholder: 'New activity' },
+  x: { label: 'Exercise', placeholder: 'New exercise' },
+} as const;
+
+export function OtherCardView({ card, refTime, onChange, onRemove }: { card: OtherCard; refTime?: number; onChange: (c: OtherCard) => void; onRemove: () => void }) {
   const s = settings.value;
+  const [adding, setAdding] = useState<null | 'p' | 'a' | 'x'>(null);
   const [typing, setTyping] = useState(false);
   const [text, setText] = useState('');
   const set = (p: Partial<OtherCard>) => onChange({ ...card, ...p } as OtherCard);
@@ -168,13 +193,20 @@ export function OtherCardView({ card, onChange, onRemove }: { card: OtherCard; o
   if (card.kind === 'move') {
     const items: MenuItem[] = [
       ...s.postures.map((p) => ({ v: `p:${p}`, label: POSTURES[p]?.label ?? p, section: 'Posture' })),
+      { v: 'new:p', label: 'Other posture…', action: true, section: 'Posture' },
+      ...s.activities.map((a) => ({ v: `a:${a}`, label: a, section: 'Activity' })),
+      { v: 'new:a', label: 'Other activity…', action: true, section: 'Activity' },
       ...s.exercises.map((x) => ({ v: `x:${x}`, label: x, section: 'Exercise' })),
-      { v: 'new', label: 'Other exercise…', action: true, section: 'Exercise' },
+      { v: 'new:x', label: 'Other exercise…', action: true, section: 'Exercise' },
     ];
     const commit = () => {
       const v = text.trim();
-      if (v) { rememberChip('exercises', v); set({ pick: `x:${v}` }); }
-      setTyping(false);
+      if (v && adding) {
+        if (adding === 'p') set({ pick: `p:${rememberPosture(v)}` });
+        else if (adding === 'a') set({ pick: `a:${rememberChip('activities', v)}` });
+        else set({ pick: `x:${rememberChip('exercises', v)}` });
+      }
+      setAdding(null);
       setText('');
     };
     const exercise = card.pick?.startsWith('x:');
@@ -182,12 +214,14 @@ export function OtherCardView({ card, onChange, onRemove }: { card: OtherCard; o
       <CardShell kind="move" onRemove={onRemove}>
         <MenuRow
           label="What" placeholder="Choose" display={card.pick ? moveLabel(card.pick) : undefined} autoOpen={card.fresh && !card.pick}
-          items={items} value={card.pick ? [card.pick] : []} onChange={([pick]) => set({ pick })} onAction={() => { primeKeyboard(); setTyping(true); }}
+          items={items} value={card.pick ? [card.pick] : []}
+          onChange={([pick]) => { setAdding(null); setText(''); set({ pick }); }}
+          onAction={(v) => { primeKeyboard(); setText(''); setAdding(v.slice(4) as 'p' | 'a' | 'x'); }}
         />
-        {typing && <TextRow label="Exercise" value={text} onInput={setText} onDone={commit} autoFocus />}
+        {adding && <TextRow label={ADD_META[adding].label} placeholder={ADD_META[adding].placeholder} actionLabel="Add" value={text} onInput={setText} onDone={commit} autoFocus />}
         {card.pick && (
           <>
-            <WhenRow value={card.when} onChange={(when) => set({ when })} />
+            <WhenRow value={card.when} refTime={refTime} onChange={(when) => set({ when })} />
             <MinutesRow label="For" value={card.minutes} onChange={(minutes) => set({ minutes })} />
             {exercise && hasHolds(card.pick.slice(2)) && (
               <MinutesRow label="Each hold" unit="s" options={HOLDS} value={card.hold} onChange={(hold) => set({ hold })} />
@@ -214,7 +248,7 @@ export function OtherCardView({ card, onChange, onRemove }: { card: OtherCard; o
           onInput={(name) => set({ name: name || undefined })} onDone={() => set({ name: card.name?.trim() || undefined })}
         />
       ) : typing ? (
-        <TextRow label="Medication" placeholder="Name" value={text} onInput={setText} onDone={commit} autoFocus />
+        <TextRow label="Medication" placeholder="Name" actionLabel="Add" value={text} onInput={setText} onDone={commit} autoFocus />
       ) : (
         <MenuRow
           label="Medication" placeholder="Choose" display={card.name} autoOpen={card.fresh && !card.name}
@@ -227,7 +261,7 @@ export function OtherCardView({ card, onChange, onRemove }: { card: OtherCard; o
       {card.name && (
         <>
           <TextRow label="Dose" value={card.dose} onInput={(dose) => set({ dose })} />
-          <WhenRow label="Taken" value={card.when} onChange={(when) => set({ when })} />
+          <WhenRow label="Taken" value={card.when} refTime={refTime} onChange={(when) => set({ when })} />
         </>
       )}
     </CardShell>

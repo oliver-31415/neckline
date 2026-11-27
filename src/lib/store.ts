@@ -30,7 +30,8 @@ export async function init() {
     // v2: sitting/standing postures and whole-body exercises (walks, swims…) replace the old defaults.
     // v3: holding grandchild.
     const added = [...(v < 2 ? ['couch', 'office', 'car', 'standing'] : []), 'grandchild'];
-    merged.postures = Object.keys(POSTURES).filter((k) => added.includes(k) || merged.postures.includes(k));
+    const custom = merged.postures.filter((k) => !(k in POSTURES));
+    merged.postures = [...Object.keys(POSTURES).filter((k) => added.includes(k) || merged.postures.includes(k)), ...custom];
     if (v < 2) merged.exercises = [...DEFAULT_SETTINGS.exercises, ...merged.exercises.filter((x) => !OLD_EXERCISES.includes(x) && !DEFAULT_SETTINGS.exercises.includes(x))];
     merged.version = 3;
     await db.saveSettings(merged);
@@ -96,8 +97,31 @@ export async function rememberTreatment(name: string, kind: string, dose?: strin
   await updateSettings({ treatments: [{ name, kind, dose }, ...list].slice(0, 16) });
 }
 
-/** Add a custom chip value to a settings list if it's new. */
-export async function rememberChip(key: 'qualities' | 'symptoms' | 'activities' | 'exercises' | 'mealTags' | 'sideEffects', value: string) {
+/** Add a custom chip value to a settings list if it's new; returns the stored spelling. */
+export function rememberChip(key: 'qualities' | 'symptoms' | 'activities' | 'exercises' | 'mealTags' | 'sideEffects', value: string): string {
+  const v = value.trim();
   const list = settings.value[key];
-  if (!list.some((v) => v.toLowerCase() === value.toLowerCase())) await updateSettings({ [key]: [...list, value] });
+  const existing = list.find((x) => x.toLowerCase() === v.toLowerCase());
+  if (existing) return existing;
+  void updateSettings({ [key]: [...list, v] });
+  return v;
+}
+
+/** Remember a posture (enabling a built-in one if it matches, or adding a custom one); returns its stored key/name. */
+export function rememberPosture(value: string): string {
+  const v = value.trim();
+  const low = v.toLowerCase();
+  const cur = settings.value.postures;
+  const builtIn = Object.entries(POSTURES).find(([k, p]) => k.toLowerCase() === low || p.label.toLowerCase() === low)?.[0];
+  if (builtIn) {
+    if (!cur.includes(builtIn)) {
+      const custom = cur.filter((x) => !(x in POSTURES));
+      void updateSettings({ postures: [...Object.keys(POSTURES).filter((x) => x === builtIn || cur.includes(x)), ...custom] });
+    }
+    return builtIn;
+  }
+  const existing = cur.find((x) => x.toLowerCase() === low);
+  if (existing) return existing;
+  void updateSettings({ postures: [...cur, v] });
+  return v;
 }

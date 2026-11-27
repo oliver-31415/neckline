@@ -1,4 +1,4 @@
-import { entries, rememberChip, rememberTreatment, removeEntry, saveEntry, settings, uid } from '../lib/store';
+import { entries, rememberChip, rememberPosture, rememberTreatment, removeEntry, saveEntry, settings, uid } from '../lib/store';
 import { AREA_KINDS, DURATIONS, HELPED_LABELS, IMPACTS, POSTURES, TREATMENT_KINDS } from '../lib/catalog';
 import { ARM_SHAPES, BACK_SHAPES, FRONT_SHAPES, SPINE, SENSATION_LABEL, regionLabel, regionNames } from '../components/BodyMap';
 import { slotStatus } from '../lib/env';
@@ -81,7 +81,7 @@ const ITEM: ObjectSchema = {
     helped: { type: 'string', enum: Object.keys(HELPED_LABELS), description: Object.entries(HELPED_LABELS).map(([k, v]) => `${k}: ${v}`).join('; ') },
     side_effects: { type: 'array', maxItems: 8, items: { type: 'string', maxLength: 40 } },
     kind: { type: 'string', enum: TREATMENT_KINDS.map((k) => k.id).filter((k) => k !== 'medication' && k !== 'exercises') },
-    posture: { type: 'string', enum: Object.keys(POSTURES), description: Object.entries(POSTURES).map(([k, v]) => `${k}: ${v.label}`).join('; ') },
+    posture: { type: 'string', maxLength: 60, description: `Built-in posture id (${Object.entries(POSTURES).map(([k, v]) => `${k}: ${v.label}`).join('; ')}) or a custom posture name from get_log_options.` },
     minutes: { type: 'integer', minimum: 1, maximum: 1440 },
     hold_seconds: { type: 'integer', minimum: 1, maximum: 600 },
     breaks: { type: 'string', enum: ['yes', 'some', 'no'] },
@@ -177,10 +177,14 @@ function plan(i: any, now: number, due: string | null): Planned {
       return { entry, line: `Exercise · ${at(start)}\n${name}${dose ? `, ${dose}` : ''}${noteLine}`, remember: () => rememberChip('exercises', name) };
     }
     case 'posture': {
-      if (!i.posture) throw new ToolError('A posture entry needs a posture.');
-      const entry: Entry = { ...base, time: start, type: 'posture', posture: i.posture, minutes: i.minutes ?? null, breaks: i.breaks ?? null };
+      if (!i.posture?.trim()) throw new ToolError('A posture entry needs a posture.');
+      const raw = i.posture.trim();
+      const low = raw.toLowerCase();
+      const builtIn = Object.entries(POSTURES).find(([k, p]) => k.toLowerCase() === low || p.label.toLowerCase() === low)?.[0];
+      const posture = builtIn ?? match(s.postures, raw);
+      const entry: Entry = { ...base, time: start, type: 'posture', posture, minutes: i.minutes ?? null, breaks: i.breaks ?? null };
       const breaks = i.breaks ? `, ${{ yes: 'with breaks', some: 'a few breaks', no: 'no breaks' }[i.breaks as 'yes']}` : '';
-      return { entry, line: `Posture · ${at(start)}\n${POSTURES[i.posture].label}${i.minutes ? `, ${fmtMinutes(i.minutes)}` : ''}${breaks}${noteLine}`, remember: () => {} };
+      return { entry, line: `Posture · ${at(start)}\n${POSTURES[posture]?.label ?? posture}${i.minutes ? `, ${fmtMinutes(i.minutes)}` : ''}${breaks}${noteLine}`, remember: () => rememberPosture(posture) };
     }
     case 'activity': {
       if (!i.name?.trim()) throw new ToolError('An activity entry needs the activity’s name.');

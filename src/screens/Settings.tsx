@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import { settings, updateSettings, wipe, entries, persisted, keepData } from '../lib/store';
+import { settings, updateSettings, wipe, entries, persisted, keepData, rememberPosture } from '../lib/store';
 import { ServerBackup } from './ServerBackup';
 import { AiSettings } from './AiSettings';
 import { go } from '../lib/nav';
@@ -84,7 +84,7 @@ export function Settings() {
       <AiSettings />
 
       <Block title="Lists" flush>
-        <NavRow label="Postures" value={`${s.postures.length} of ${Object.keys(POSTURES).length}`} onClick={() => setOpen('postures')} />
+        <NavRow label="Postures" value={s.postures.length} onClick={() => setOpen('postures')} />
         {LISTS.slice(0, 2).map(({ k, label }) => <NavRow key={k} label={label} value={editable(k, s[k]).length} onClick={() => setOpen(k)} />)}
         <NavRow label="Medications" value={meds.length} onClick={() => setOpen('meds')} />
         {LISTS.slice(2).map(({ k, label }) => <NavRow key={k} label={label} value={s[k].length} onClick={() => setOpen(k)} />)}
@@ -143,15 +143,29 @@ export function Settings() {
       </Block>
 
       {open === 'times' && <TimesSheet times={s.checkinTimes} onChange={setTimes} onClose={() => setOpen(null)} />}
-      {open === 'postures' && (
-        <Sheet title="Postures" onClose={() => setOpen(null)}>
-          <div class="group">
-            {Object.entries(POSTURES).map(([k, p]) => (
-              <ToggleRow key={k} label={p.label} checked={s.postures.includes(k)} onChange={(v) => updateSettings({ postures: Object.keys(POSTURES).filter((x) => (x === k ? v : s.postures.includes(x))) })} />
-            ))}
-          </div>
-        </Sheet>
-      )}
+      {open === 'postures' && (() => {
+        const custom = s.postures.filter((x) => !(x in POSTURES));
+        return (
+          <Sheet title="Postures" onClose={() => setOpen(null)} tall>
+            <section class="section">
+              <div class="sec-head"><span>Your own</span></div>
+              <ListEditor
+                items={custom} addLabel="New posture"
+                onRemove={(v) => updateSettings({ postures: settings.value.postures.filter((x) => x !== v) })}
+                onAdd={(v) => { rememberPosture(v); }}
+              />
+            </section>
+            <section class="section">
+              <div class="sec-head"><span>Built-in</span></div>
+              <div class="group">
+                {Object.entries(POSTURES).map(([k, p]) => (
+                  <ToggleRow key={k} label={p.label} checked={s.postures.includes(k)} onChange={(v) => updateSettings({ postures: [...Object.keys(POSTURES).filter((x) => (x === k ? v : s.postures.includes(x))), ...custom] })} />
+                ))}
+              </div>
+            </section>
+          </Sheet>
+        );
+      })()}
       {open === 'meds' && (
         <Sheet title="Medications" onClose={() => setOpen(null)}>
           {meds.length

@@ -3,7 +3,7 @@ import { Block, Chips, Seg, Sheet, WhenPicker } from '../components/ui';
 import { IconCamera } from '../components/Icons';
 import { HELPED_LABELS, POSTURES, POSTURE_DURATIONS, TREATMENT_KINDS } from '../lib/catalog';
 import { closeSheet } from '../lib/nav';
-import { rememberChip, rememberTreatment, settings, uid } from '../lib/store';
+import { rememberChip, rememberPosture, rememberTreatment, settings, uid } from '../lib/store';
 import { getPhoto, putPhoto } from '../lib/db';
 import { dayKey, fmtDay, fromDayKey } from '../lib/time';
 import type { ActivityEntry, DayEntry, Helped, MealEntry, PostureEntry, TreatmentEntry } from '../lib/types';
@@ -38,7 +38,7 @@ export function PostureForm({ entry }: { entry?: PostureEntry }) {
     <Sheet title="Posture" onClose={closeSheet} tall action={{ label: isNew ? 'Add' : 'Save', onClick: () => d.posture ? commit({ ...d, minutes: d.minutes ?? null }, isNew) : alert('Pick a posture first.') }}>
       <WhenPicker value={d.time} onChange={(time) => set({ time })} />
       <Block title="How was your head and neck mostly?">
-        <PostureTiles single options={settings.value.postures} value={d.posture ? [d.posture] : []} onChange={(v) => set({ posture: v[0] ?? '' })} />
+        <PostureTiles single options={settings.value.postures} value={d.posture ? [d.posture] : []} onChange={(v) => set({ posture: v[0] ?? '' })} onAdd={(v) => rememberPosture(v)} />
       </Block>
       <Block title="Roughly how long?">
         <DurationChips value={d.minutes} onChange={(minutes) => set({ minutes })} />

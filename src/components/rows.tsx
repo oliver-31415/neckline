@@ -74,7 +74,7 @@ export function ListEditor({ items, label = (v) => v, onRemove, onAdd, addLabel 
           <button type="button" class="x-btn" aria-label={`Remove ${label(v)}`} onClick={() => onRemove(v)}><IconClose /></button>
         </div>
       ))}
-      {onAdd && <TextRow label="Add" placeholder={addLabel} value={text} onInput={setText} onDone={add} />}
+      {onAdd && <TextRow label="Add" placeholder={addLabel} actionLabel="Add" value={text} onInput={setText} onDone={add} />}
     </div>
   );
 }
